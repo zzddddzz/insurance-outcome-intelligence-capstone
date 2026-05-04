@@ -6,21 +6,15 @@
   <string>com.dizhang.cloudflared-tunnel</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/dizhang/.cloudflared/cloudflared</string>
-    <string>--config</string>
-    <string>/Users/dizhang/.cloudflared/config.yml</string>
-    <string>tunnel</string>
-    <string>run</string>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>mkdir -p "$HOME/.cloudflared/logs"; exec "$HOME/.cloudflared/cloudflared" --config "$HOME/.cloudflared/config.yml" tunnel run &gt;&gt; "$HOME/.cloudflared/logs/cloudflared.launchd.out.log" 2&gt;&gt; "$HOME/.cloudflared/logs/cloudflared.launchd.err.log"</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>WorkingDirectory</key>
-  <string>/Users/dizhang</string>
-  <key>StandardOutPath</key>
-  <string>/Users/dizhang/.cloudflared/logs/cloudflared.launchd.out.log</string>
-  <key>StandardErrorPath</key>
-  <string>/Users/dizhang/.cloudflared/logs/cloudflared.launchd.err.log</string>
+  <string>/Users</string>
 </dict>
 </plist>
