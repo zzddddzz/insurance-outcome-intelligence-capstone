@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.zzddddzz.msds498-dashboard</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/dizhang/GitHub/insurance-outcome-intelligence-capstone</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/dizhang/GitHub/insurance-outcome-intelligence-capstone/.venv/bin/python</string>
+    <string>-m</string>
+    <string>streamlit</string>
+    <string>run</string>
+    <string>dashboard.py</string>
+    <string>--server.port</string>
+    <string>8502</string>
+    <string>--server.address</string>
+    <string>127.0.0.1</string>
+    <string>--server.headless</string>
+    <string>true</string>
+    <string>--server.fileWatcherType</string>
+    <string>none</string>
+    <string>--browser.gatherUsageStats</string>
+    <string>false</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/dizhang/GitHub/insurance-outcome-intelligence-capstone/logs/msds498-dashboard.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/dizhang/GitHub/insurance-outcome-intelligence-capstone/logs/msds498-dashboard.err.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/dizhang</string>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+</dict>
+</plist>
