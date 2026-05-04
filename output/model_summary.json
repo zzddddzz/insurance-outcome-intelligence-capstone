@@ -1,0 +1,220 @@
+{
+  "lapse_model": {
+    "val": {
+      "accuracy": 0.8027224764625295,
+      "precision": 0.23199205166418282,
+      "recall": 0.7618270799347472,
+      "f1": 0.3556740289413557,
+      "roc_auc": 0.8643684819800571
+    },
+    "test": {
+      "accuracy": 0.8047045792403883,
+      "precision": 0.2360178970917226,
+      "recall": 0.7744698205546493,
+      "f1": 0.36178319679939036,
+      "roc_auc": 0.8673960477520617
+    }
+  },
+  "claim_model": {
+    "rmse": 1429.6772610077337,
+    "mae": 341.21394110803305,
+    "r2": 0.3696784118805908,
+    "mape": 44.68778815186709,
+    "val": {
+      "rmse": 1429.6772610077337,
+      "mae": 341.21394110803305,
+      "r2": 0.3696784118805908,
+      "mape": 44.68778815186709
+    },
+    "test": {
+      "rmse": 1327.9990920287173,
+      "mae": 326.67791349131494,
+      "r2": 0.34676688986008375,
+      "mape": 43.95451380120484
+    }
+  },
+  "data_shape": [
+    228711,
+    60
+  ],
+  "total_customers": 1467,
+  "total_policies": 45162,
+  "decision_actions": {
+    "STANDARD": 152310,
+    "RETAIN_HIGH": 56394,
+    "EARLY_RISK": 19855,
+    "LOW_PRIORITY": 152
+  },
+  "split": {
+    "train": 0.7,
+    "validation": 0.15,
+    "test": 0.15
+  },
+  "model_metadata": {
+    "lapse": {
+      "features": [
+        "age",
+        "gender",
+        "seniority_insured",
+        "seniority_policy",
+        "type_policy",
+        "type_policy_dg",
+        "type_product",
+        "reimbursement",
+        "new_business",
+        "distribution_channel",
+        "premium",
+        "n_medical_services",
+        "C_H",
+        "C_C",
+        "C_GI",
+        "C_II",
+        "C_IE_P",
+        "C_IE_S",
+        "C_IE_T",
+        "C_GE_P",
+        "C_GE_S",
+        "C_GE_T",
+        "IICIMUN",
+        "IICIPROV",
+        "n_insured_pc",
+        "n_insured_mun",
+        "n_insured_prov",
+        "age_group",
+        "tenure_group",
+        "premium_pctile",
+        "new_business_flag"
+      ],
+      "numerical_cols": [
+        "age",
+        "seniority_insured",
+        "seniority_policy",
+        "premium",
+        "n_medical_services",
+        "C_GI",
+        "C_II",
+        "C_IE_P",
+        "C_IE_S",
+        "C_IE_T",
+        "C_GE_P",
+        "C_GE_S",
+        "C_GE_T",
+        "IICIMUN",
+        "IICIPROV",
+        "n_insured_pc",
+        "n_insured_mun",
+        "n_insured_prov",
+        "premium_pctile",
+        "new_business_flag"
+      ],
+      "categorical_cols": [
+        "gender",
+        "type_policy",
+        "type_policy_dg",
+        "type_product",
+        "reimbursement",
+        "new_business",
+        "distribution_channel",
+        "C_H",
+        "C_C",
+        "age_group",
+        "tenure_group"
+      ],
+      "excluded_leakage_features": [
+        "exposure_time",
+        "loss_ratio",
+        "claim_premium_ratio_capped",
+        "avg_claim_per_service",
+        "over_claim",
+        "high_claim_flag"
+      ],
+      "target": "lapse_binary"
+    },
+    "claim": {
+      "features": [
+        "age",
+        "gender",
+        "seniority_insured",
+        "seniority_policy",
+        "type_policy",
+        "type_policy_dg",
+        "type_product",
+        "reimbursement",
+        "new_business",
+        "distribution_channel",
+        "premium",
+        "n_medical_services",
+        "C_H",
+        "C_C",
+        "C_GI",
+        "C_II",
+        "C_IE_P",
+        "C_IE_S",
+        "C_IE_T",
+        "C_GE_P",
+        "C_GE_S",
+        "C_GE_T",
+        "IICIMUN",
+        "IICIPROV",
+        "n_insured_pc",
+        "n_insured_mun",
+        "n_insured_prov",
+        "age_group",
+        "tenure_group",
+        "premium_pctile",
+        "new_business_flag"
+      ],
+      "numerical_cols": [
+        "age",
+        "seniority_insured",
+        "seniority_policy",
+        "premium",
+        "n_medical_services",
+        "C_GI",
+        "C_II",
+        "C_IE_P",
+        "C_IE_S",
+        "C_IE_T",
+        "C_GE_P",
+        "C_GE_S",
+        "C_GE_T",
+        "IICIMUN",
+        "IICIPROV",
+        "n_insured_pc",
+        "n_insured_mun",
+        "n_insured_prov",
+        "premium_pctile",
+        "new_business_flag"
+      ],
+      "categorical_cols": [
+        "gender",
+        "type_policy",
+        "type_policy_dg",
+        "type_product",
+        "reimbursement",
+        "new_business",
+        "distribution_channel",
+        "C_H",
+        "C_C",
+        "age_group",
+        "tenure_group"
+      ],
+      "excluded_leakage_features": [
+        "exposure_time",
+        "loss_ratio",
+        "claim_premium_ratio_capped",
+        "avg_claim_per_service",
+        "over_claim",
+        "high_claim_flag"
+      ],
+      "target": "cost_claims_year"
+    }
+  },
+  "sensitivity_outputs": [
+    "output/sensitivity_age.png",
+    "output/sensitivity_premium.png",
+    "output/sensitivity_n_medical_services.png",
+    "output/sensitivity_type_product.png",
+    "output/sensitivity_distribution_channel.png"
+  ]
+}
