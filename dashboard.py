@@ -13,7 +13,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import joblib
 import json
 
 # Page config
@@ -32,10 +31,6 @@ st.markdown("*Team 54 - MSDS 498 Capstone | Pavani Katamreddy, Ashin Katwala, Hy
 @st.cache_data(ttl=3600)
 def load_predictions(path="output/predictions_sample.csv"):
     return pd.read_csv(path)
-
-@st.cache_data(ttl=3600)
-def load_model(path="models/lapse_model.pkl"):
-    return joblib.load(path)
 
 @st.cache_data(ttl=3600)
 def load_summary(path="output/model_summary.json"):
@@ -57,7 +52,6 @@ def load_age_summary(path="output/age_summary.csv"):
 
 # Load all data
 df = load_predictions()
-lapse_model = load_model()
 model_summary = load_summary()
 seg_summary = load_segment_summary()
 decision_summary = load_decision_summary()
