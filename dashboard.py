@@ -1,127 +1,42 @@
+"""Interactive Streamlit dashboard for the Team 54 capstone."""
+
+from __future__ import annotations
+
+import json
 from pathlib import Path
 
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 
-APP_ROOT = Path(__file__).resolve().parent
-DESIGN_PROJECT = (
-    APP_ROOT
-    / "claude_design"
-    / "team-54-streamlit-dashboard-redesign"
-    / "project"
-)
-JSX_FILES = [
-    "atoms.jsx",
-    "parts-shell.jsx",
-    "parts-mid.jsx",
-    "parts-detail.jsx",
-    "parts-states.jsx",
-    "app-exec.jsx",
-    "app-review.jsx",
-]
+ROOT = Path(__file__).resolve().parent
 
+ACTION_COLORS = {
+    "RETAIN_HIGH": "#2f7d51",
+    "REVIEW_PRICING": "#b9484a",
+    "EARLY_RISK": "#8f3d3d",
+    "LOW_PRIORITY": "#76629c",
+    "STANDARD": "#315f86",
+}
 
-def _read_text(name: str) -> str:
-    return (DESIGN_PROJECT / name).read_text(encoding="utf-8")
+ACTION_LABELS = {
+    "ALL": "All",
+    "RETAIN_HIGH": "Retain",
+    "REVIEW_PRICING": "Reprice",
+    "EARLY_RISK": "Early risk",
+    "LOW_PRIORITY": "Low priority",
+    "STANDARD": "Standard",
+}
 
-
-def _inline_script(source: str, script_type: str = "text/javascript") -> str:
-    safe_source = source.replace("</script", "<\\/script")
-    type_attr = f' type="{script_type}"' if script_type else ""
-    presets = ' data-presets="react"' if script_type == "text/babel" else ""
-    return f"<script{type_attr}{presets}>\n{safe_source}\n</script>"
-
-
-@st.cache_data(show_spinner=False)
-def build_design_app_html() -> str:
-    tokens = _read_text("tokens.css")
-    data_js = _read_text("data.js")
-    jsx_bundle = "\n\n".join(_read_text(name) for name in JSX_FILES)
-
-    boot_jsx = """
-const ProductionApp = () => {
-  const [width, setWidth] = React.useState(window.innerWidth);
-
-  React.useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  if (width < 760) {
-    return (
-      <div className="production-root production-root-review">
-        <ReviewPane />
-      </div>
-    );
-  }
-
-  return (
-    <div className="production-root">
-      <ExecDashboard
-        withDrawer={width >= 1280}
-        initialSelected="S-014"
-        compact={width < 1120}
-      />
-    </div>
-  );
-};
-
-ReactDOM.createRoot(document.getElementById('root')).render(<ProductionApp />);
-"""
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Portfolio Action Console</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-{tokens}
-
-html, body, #root {{
-  width: 100%;
-  min-height: 100%;
-  margin: 0;
-  background: var(--bg-page);
-}}
-
-body {{
-  overflow: hidden;
-}}
-
-.production-root {{
-  width: 100%;
-  height: 1100px;
-  background: var(--bg-page);
-  overflow: hidden;
-}}
-
-.production-root-review {{
-  height: 1180px;
-}}
-
-@media (max-width: 759px) {{
-  body {{
-    overflow: auto;
-  }}
-}}
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
-{_inline_script(data_js)}
-{_inline_script(jsx_bundle, "text/babel")}
-{_inline_script(boot_jsx, "text/babel")}
-</body>
-</html>"""
+ACTION_NOTES = {
+    "RETAIN_HIGH": "High lapse risk and profitable. Prioritize retention outreach.",
+    "REVIEW_PRICING": "Underpriced relative to expected claims. Review pricing.",
+    "EARLY_RISK": "High expected claims. Route to clinical or financial intervention.",
+    "LOW_PRIORITY": "High lapse and limited margin. Keep light-touch outreach.",
+    "STANDARD": "No immediate escalation. Keep normal portfolio management.",
+}
 
 
 st.set_page_config(
@@ -131,34 +46,740 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+
+def add_css() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --bg-page: #f4f5f3;
+            --bg-card: #ffffff;
+            --bg-rail: #fafbf9;
+            --ink-1: #0e1a1f;
+            --ink-2: #29363c;
+            --ink-3: #5d6970;
+            --ink-4: #8a949b;
+            --line-1: #dde0db;
+            --line-2: #e8eae5;
+            --teal: #2f6f67;
+            --red: #b9484a;
+            --amber: #c08a2d;
+            --violet: #76629c;
+        }
+
+        #MainMenu, footer, [data-testid="stDecoration"] { display: none !important; }
+        header[data-testid="stHeader"] { display: none !important; }
+
+        .stApp {
+            background: var(--bg-page);
+            color: var(--ink-1);
+        }
+
+        .block-container {
+            max-width: 1320px;
+            padding-top: 1rem;
+            padding-bottom: 2rem;
+        }
+
+        section[data-testid="stSidebar"] {
+            background: var(--bg-rail);
+            border-right: 1px solid var(--line-1);
+        }
+
+        h1, h2, h3, p, label, span, div { letter-spacing: 0; }
+
+        .topbar {
+            align-items: center;
+            background: var(--bg-card);
+            border: 1px solid var(--line-1);
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+        }
+
+        .brand {
+            align-items: center;
+            display: flex;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            align-items: center;
+            background: var(--ink-1);
+            border-radius: 3px;
+            color: white;
+            display: inline-flex;
+            font-size: 11px;
+            font-weight: 700;
+            height: 22px;
+            justify-content: center;
+            letter-spacing: 0;
+            width: 22px;
+        }
+
+        .brand-title {
+            color: var(--ink-1);
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .brand-subtitle {
+            color: var(--ink-4);
+            font-size: 12px;
+            line-height: 1.2;
+        }
+
+        .live-pill {
+            align-items: center;
+            background: #eef3ef;
+            border: 1px solid var(--line-2);
+            border-radius: 999px;
+            color: var(--ink-3);
+            display: inline-flex;
+            font-size: 12px;
+            gap: 6px;
+            padding: 3px 9px;
+        }
+
+        .live-pill::before {
+            background: #64a36f;
+            border-radius: 50%;
+            content: "";
+            height: 7px;
+            width: 7px;
+        }
+
+        .page-kicker {
+            color: var(--ink-4);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+        }
+
+        .page-title {
+            color: var(--ink-1);
+            font-size: clamp(28px, 4vw, 42px);
+            font-weight: 750;
+            line-height: 1;
+            margin: 0;
+        }
+
+        .page-copy {
+            color: var(--ink-3);
+            font-size: 15px;
+            line-height: 1.45;
+            margin: 8px 0 16px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--line-1);
+            border-radius: 5px;
+            min-height: 116px;
+            padding: 13px 14px;
+        }
+
+        .kpi-label {
+            color: var(--ink-4);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .kpi-value {
+            color: var(--ink-1);
+            font-size: 27px;
+            font-weight: 650;
+            line-height: 1.05;
+            margin-top: 8px;
+        }
+
+        .kpi-delta {
+            color: var(--ink-3);
+            font-size: 12px;
+            line-height: 1.35;
+            margin-top: 7px;
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--line-1);
+            border-radius: 5px;
+            margin-bottom: 12px;
+            padding: 13px 14px;
+        }
+
+        .panel-head {
+            align-items: baseline;
+            border-bottom: 1px solid var(--line-2);
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            margin: -13px -14px 12px;
+            padding: 11px 14px;
+        }
+
+        .panel-title {
+            color: var(--ink-1);
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+
+        .panel-meta {
+            color: var(--ink-4);
+            font-size: 12px;
+            line-height: 1.35;
+            text-align: right;
+        }
+
+        .action-chip {
+            border: 1px solid;
+            border-radius: 3px;
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            padding: 2px 7px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .chip-retain { background: #eaf3e7; border-color: #bfd8bb; color: #2f7d51; }
+        .chip-review_pricing { background: #f7e6e3; border-color: #e2c0bd; color: #9b3f42; }
+        .chip-early_risk { background: #f3dbd9; border-color: #dbaaa7; color: #8f3d3d; }
+        .chip-low_priority { background: #eee8f7; border-color: #cdc1e0; color: #67518c; }
+        .chip-standard { background: #e7edf3; border-color: #bfd0df; color: #315f86; }
+
+        .segment-card {
+            background: var(--bg-card);
+            border: 1px solid var(--line-1);
+            border-left: 3px solid var(--teal);
+            border-radius: 5px;
+            margin-bottom: 8px;
+            padding: 10px 12px;
+        }
+
+        .segment-name {
+            color: var(--ink-1);
+            font-size: 14px;
+            font-weight: 750;
+            line-height: 1.3;
+        }
+
+        .segment-grid {
+            display: grid;
+            gap: 7px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            margin-top: 8px;
+        }
+
+        .mini-label {
+            color: var(--ink-4);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .mini-value {
+            color: var(--ink-1);
+            font-size: 13px;
+            font-weight: 650;
+        }
+
+        div[data-testid="stRadio"] > label { display: none; }
+        div[role="radiogroup"] {
+            background: var(--bg-card);
+            border: 1px solid var(--line-1);
+            border-radius: 5px;
+            gap: 0.25rem;
+            padding: 4px;
+        }
+
+        div[role="radiogroup"] label {
+            border-radius: 4px;
+            min-height: 32px;
+            padding: 3px 10px;
+        }
+
+        div[role="radiogroup"] label:has(input:checked) {
+            background: var(--ink-1);
+            color: white;
+        }
+
+        @media (max-width: 800px) {
+            .topbar { align-items: flex-start; gap: 10px; }
+            .segment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .panel-head { align-items: flex-start; flex-direction: column; }
+            .panel-meta { text-align: left; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+@st.cache_data(ttl=3600)
+def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
+    predictions = pd.read_csv(ROOT / "output" / "predictions_sample.csv")
+    segments = pd.read_csv(ROOT / "output" / "segment_summary.csv")
+    decisions = pd.read_csv(ROOT / "output" / "decision_summary.csv")
+    ages = pd.read_csv(ROOT / "output" / "age_summary.csv")
+    model_summary = json.loads((ROOT / "output" / "model_summary.json").read_text())
+    return predictions, segments, decisions, ages, model_summary
+
+
+def fmt_int(value: float) -> str:
+    return f"{value:,.0f}"
+
+
+def fmt_money(value: float) -> str:
+    return f"${value:,.0f}"
+
+
+def fmt_pct(value: float) -> str:
+    return f"{value * 100:.1f}%"
+
+
+def action_chip(action: str) -> str:
+    css = action.lower()
+    return (
+        f'<span class="action-chip chip-{css}">'
+        f"{ACTION_LABELS.get(action, action).upper()}</span>"
+    )
+
+
+def panel_header(title: str, meta: str = "") -> None:
+    st.markdown(
+        f"""
+        <div class="panel-head">
+            <div class="panel-title">{title}</div>
+            <div class="panel-meta">{meta}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def kpi_card(label: str, value: str, delta: str) -> None:
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value}</div>
+            <div class="kpi-delta">{delta}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def segment_cards(segment_frame: pd.DataFrame, limit: int = 5) -> None:
+    ranked = segment_frame.sort_values(
+        ["lapse_rate", "loss_ratio", "count"],
+        ascending=[False, False, False],
+    ).head(limit)
+
+    if ranked.empty:
+        st.info("No segments match the current filters.")
+        return
+
+    for idx, row in enumerate(ranked.itertuples(index=False), start=1):
+        label = f"{row.type_product} product · {row.type_policy_dg} policy"
+        action = "REVIEW_PRICING" if row.loss_ratio > 1 else "RETAIN_HIGH"
+        if row.lapse_rate < 0.08 and row.loss_ratio < 0.8:
+            action = "STANDARD"
+        elif row.loss_ratio > 2:
+            action = "EARLY_RISK"
+
+        st.markdown(
+            f"""
+            <div class="segment-card">
+                <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+                    <div class="segment-name">#{idx:02d} {label}</div>
+                    {action_chip(action)}
+                </div>
+                <div class="segment-grid">
+                    <div><div class="mini-label">Members</div><div class="mini-value">{fmt_int(row.count)}</div></div>
+                    <div><div class="mini-label">Lapse</div><div class="mini-value">{row.lapse_rate * 100:.1f}%</div></div>
+                    <div><div class="mini-label">Claim</div><div class="mini-value">{fmt_money(row.avg_claim)}</div></div>
+                    <div><div class="mini-label">Loss ratio</div><div class="mini-value">{row.loss_ratio:.2f}</div></div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def empty_filter_guard(frame: pd.DataFrame) -> None:
+    if frame.empty:
+        st.warning("No records match the current filters. Loosen the filters in the sidebar.")
+        st.stop()
+
+
+add_css()
+df, seg_summary, decision_summary, age_summary, model_summary = load_data()
+
+with st.sidebar:
+    st.markdown("### Filters")
+    products = st.multiselect(
+        "Product",
+        sorted(df["type_product"].dropna().unique()),
+        default=sorted(df["type_product"].dropna().unique()),
+    )
+    policies = st.multiselect(
+        "Policy type",
+        sorted(df["type_policy_dg"].dropna().unique()),
+        default=sorted(df["type_policy_dg"].dropna().unique()),
+    )
+    channels = st.multiselect(
+        "Channel",
+        sorted(df["distribution_channel"].dropna().unique()),
+        default=sorted(df["distribution_channel"].dropna().unique()),
+    )
+    genders = st.multiselect(
+        "Gender",
+        sorted(df["gender"].dropna().unique()),
+        default=sorted(df["gender"].dropna().unique()),
+    )
+    age_range = st.slider(
+        "Age range",
+        int(df["age"].min()),
+        int(df["age"].max()),
+        (int(df["age"].min()), int(df["age"].max())),
+    )
+    lapse_percentile = st.slider("High lapse percentile", 50, 95, 75, 1)
+    top_n = st.slider("Rows in customer table", 10, 500, 75, 5)
+
+mask = (
+    df["type_product"].isin(products)
+    & df["type_policy_dg"].isin(policies)
+    & df["distribution_channel"].isin(channels)
+    & df["gender"].isin(genders)
+    & df["age"].between(age_range[0], age_range[1])
+)
+filtered = df.loc[mask].copy()
+empty_filter_guard(filtered)
+
+action_options = ["ALL"] + [a for a in ACTION_LABELS if a != "ALL" and a in df["decision_action"].unique()]
+
 st.markdown(
     """
-    <style>
-    #MainMenu, header, footer, [data-testid="stToolbar"],
-    [data-testid="stDecoration"], [data-testid="stStatusWidget"] {
-        display: none !important;
-    }
-
-    .stApp {
-        background: #f4f5f3;
-    }
-
-    .block-container {
-        max-width: none;
-        padding: 0;
-    }
-
-    iframe {
-        display: block;
-        border: 0;
-    }
-    </style>
+    <div class="topbar">
+        <div class="brand">
+            <span class="brand-mark">PA</span>
+            <div>
+                <div class="brand-title">Portfolio Action Console</div>
+                <div class="brand-subtitle">MSDS 498 · Team 54 capstone</div>
+            </div>
+        </div>
+        <span class="live-pill">live</span>
+    </div>
     """,
     unsafe_allow_html=True,
 )
 
-if not DESIGN_PROJECT.exists():
-    st.error(f"Claude Design export is missing: {DESIGN_PROJECT}")
-    st.stop()
+st.markdown('<div class="page-kicker">Q3 2026 review</div>', unsafe_allow_html=True)
+st.markdown('<h1 class="page-title">Action plan</h1>', unsafe_allow_html=True)
+st.markdown(
+    f"""
+    <p class="page-copy">
+    {fmt_int(filtered["ID_policy"].nunique())} policies in view ·
+    {fmt_int(filtered.shape[0])} modeled records · sorted by lapse risk and claim pressure.
+    </p>
+    """,
+    unsafe_allow_html=True,
+)
 
-components.html(build_design_app_html(), height=1180, scrolling=True)
+k1, k2, k3, k4 = st.columns(4)
+book_lapse = df["lapse_probability"].mean()
+book_loss = df["loss_ratio"].mean()
+with k1:
+    kpi_card("Policies viewed", fmt_int(filtered["ID_policy"].nunique()), f"{fmt_int(df['ID_policy'].nunique())} total policies")
+with k2:
+    kpi_card("Avg lapse risk", fmt_pct(filtered["lapse_probability"].mean()), f"{(filtered['lapse_probability'].mean() - book_lapse) * 100:+.1f} pp vs book")
+with k3:
+    kpi_card("Avg claim pressure", fmt_money(filtered["predicted_claim_cost"].mean()), f"{fmt_money(df['predicted_claim_cost'].mean())} book avg")
+with k4:
+    kpi_card("Loss ratio", f"{filtered['loss_ratio'].mean():.2f}", f"{filtered['loss_ratio'].mean() - book_loss:+.2f} vs book")
+
+selected_action = st.radio(
+    "Action category",
+    action_options,
+    format_func=lambda value: ACTION_LABELS.get(value, value),
+    horizontal=True,
+    label_visibility="collapsed",
+)
+
+if selected_action != "ALL":
+    filtered = filtered[filtered["decision_action"] == selected_action].copy()
+empty_filter_guard(filtered)
+
+left, right = st.columns([1.35, 1])
+
+with left:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    panel_header("Decision quadrant", "lapse risk x predicted claim cost")
+    threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
+    cost_median = filtered["predicted_claim_cost"].median()
+
+    plot_sample = filtered.sort_values("lapse_probability", ascending=False).head(5000)
+    fig = px.scatter(
+        plot_sample,
+        x="predicted_claim_cost",
+        y="lapse_probability",
+        color="decision_action",
+        size="premium",
+        size_max=18,
+        color_discrete_map=ACTION_COLORS,
+        hover_data={
+            "ID": True,
+            "age": True,
+            "type_product": True,
+            "type_policy_dg": True,
+            "premium": ":$,.0f",
+            "predicted_claim_cost": ":$,.0f",
+            "lapse_probability": ":.3f",
+            "loss_ratio": ":.2f",
+            "decision_action": True,
+        },
+        labels={
+            "predicted_claim_cost": "Predicted claim cost",
+            "lapse_probability": "Lapse probability",
+            "decision_action": "Action",
+        },
+    )
+    fig.add_vline(x=cost_median, line_dash="dash", line_color="#8a949b")
+    fig.add_hline(y=threshold, line_dash="dash", line_color="#8a949b")
+    fig.update_layout(
+        height=420,
+        margin=dict(l=10, r=10, t=5, b=10),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        font=dict(family="Inter Tight, Arial", color="#29363c"),
+    )
+    fig.update_xaxes(gridcolor="#e8eae5")
+    fig.update_yaxes(gridcolor="#e8eae5", tickformat=".0%")
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with right:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    panel_header("Action mix", f"{fmt_int(filtered.shape[0])} records")
+    action_counts = (
+        filtered["decision_action"]
+        .value_counts()
+        .rename_axis("decision_action")
+        .reset_index(name="count")
+    )
+    fig_mix = px.bar(
+        action_counts,
+        x="count",
+        y="decision_action",
+        orientation="h",
+        color="decision_action",
+        color_discrete_map=ACTION_COLORS,
+        labels={"count": "Records", "decision_action": ""},
+    )
+    fig_mix.update_layout(
+        height=240,
+        showlegend=False,
+        margin=dict(l=0, r=5, t=5, b=5),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        font=dict(family="Inter Tight, Arial", color="#29363c"),
+    )
+    fig_mix.update_xaxes(gridcolor="#e8eae5")
+    fig_mix.update_yaxes(categoryorder="total ascending")
+    st.plotly_chart(fig_mix, use_container_width=True)
+    for action in action_counts["decision_action"].tolist():
+        st.markdown(
+            f"{action_chip(action)} "
+            f"<span style='color:#5d6970;font-size:13px'>{ACTION_NOTES.get(action, '')}</span>",
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+seg_filtered = seg_summary[
+    seg_summary["type_product"].isin(products)
+    & seg_summary["type_policy_dg"].isin(policies)
+].copy()
+
+rank_col, detail_col = st.columns([1, 1])
+with rank_col:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    panel_header("Ranked segments", f"{len(seg_filtered)} active segments")
+    segment_cards(seg_filtered)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with detail_col:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    panel_header("Segment table", "sortable, filter-aware")
+    segment_table = seg_filtered.rename(
+        columns={
+            "type_product": "Product",
+            "type_policy_dg": "Policy",
+            "count": "Members",
+            "avg_premium": "Avg Premium",
+            "avg_claim": "Avg Claim",
+            "lapse_rate": "Lapse Rate",
+            "loss_ratio": "Loss Ratio",
+            "avg_age": "Avg Age",
+        }
+    )
+    st.dataframe(
+        segment_table[
+            ["Product", "Policy", "Members", "Avg Premium", "Avg Claim", "Lapse Rate", "Loss Ratio", "Avg Age"]
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+tab_overview, tab_model, tab_sim, tab_records = st.tabs(
+    ["Portfolio trends", "Model evidence", "Simulator", "Customer records"]
+)
+
+with tab_overview:
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        panel_header("Risk by age group", "book-level summary")
+        fig_age = px.bar(
+            age_summary,
+            x="age_group",
+            y="lapse_rate",
+            color="lapse_rate",
+            color_continuous_scale="Reds",
+            labels={"age_group": "Age group", "lapse_rate": "Lapse rate"},
+        )
+        fig_age.update_layout(height=330, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
+        fig_age.update_yaxes(tickformat=".0%")
+        st.plotly_chart(fig_age, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        panel_header("Premium vs claim distribution", "current filtered view")
+        fig_hist = go.Figure()
+        fig_hist.add_trace(go.Histogram(x=filtered["premium"], name="Premium", opacity=0.72, marker_color="#315f86"))
+        fig_hist.add_trace(go.Histogram(x=filtered["predicted_claim_cost"], name="Predicted claim", opacity=0.62, marker_color="#b9484a"))
+        fig_hist.update_layout(
+            barmode="overlay",
+            height=330,
+            margin=dict(l=5, r=5, t=5, b=5),
+            legend=dict(orientation="h"),
+        )
+        st.plotly_chart(fig_hist, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+with tab_model:
+    lapse_val = model_summary["lapse_model"]["val"]
+    lapse_test = model_summary["lapse_model"]["test"]
+    claim_val = model_summary["claim_model"].get("val", model_summary["claim_model"])
+    claim_test = model_summary["claim_model"].get("test", claim_val)
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        kpi_card("Lapse ROC AUC", f"{lapse_test['roc_auc']:.3f}", f"validation {lapse_val['roc_auc']:.3f}")
+    with m2:
+        kpi_card("Lapse recall", f"{lapse_test['recall']:.3f}", f"precision {lapse_test['precision']:.3f}")
+    with m3:
+        kpi_card("Claim RMSE", fmt_money(claim_test["rmse"]), f"MAE {fmt_money(claim_test['mae'])}")
+    with m4:
+        kpi_card("Claim R²", f"{claim_test['r2']:.3f}", "held-out test")
+
+    feat_path = ROOT / "output" / "feature_importance.csv"
+    if feat_path.exists():
+        feat = pd.read_csv(feat_path).head(15).sort_values("importance")
+        fig_feat = px.bar(feat, x="importance", y="feature", orientation="h", color_discrete_sequence=["#2f6f67"])
+        fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5), yaxis_title="", xaxis_title="Importance")
+        st.plotly_chart(fig_feat, use_container_width=True)
+
+with tab_sim:
+    sim_l, sim_r = st.columns(2)
+    with sim_l:
+        premium_change = st.slider("Premium change", -20, 20, 0, 1, format="%d%%")
+    with sim_r:
+        retention_lift = st.slider("Retention lift", 0, 30, 5, 1, format="%d%%")
+
+    sim = filtered.copy()
+    sim["sim_premium"] = sim["premium"] * (1 + premium_change / 100)
+    sim["sim_lapse_probability"] = sim["lapse_probability"] * (1 - retention_lift / 100)
+    sim["sim_underpriced"] = sim["sim_premium"] < (sim["predicted_claim_cost"] * 0.8)
+    sim["sim_profitable"] = sim["sim_premium"] > sim["predicted_claim_cost"]
+    sim_threshold = sim["sim_lapse_probability"].quantile(lapse_percentile / 100)
+
+    def sim_action(row: pd.Series) -> str:
+        high_lapse = row["sim_lapse_probability"] >= sim_threshold
+        if high_lapse and row["sim_profitable"]:
+            return "RETAIN_HIGH"
+        if row["sim_underpriced"] and row["sim_profitable"]:
+            return "REVIEW_PRICING"
+        if row["sim_underpriced"] and not row["sim_profitable"]:
+            return "EARLY_RISK"
+        if high_lapse and not row["sim_profitable"]:
+            return "LOW_PRIORITY"
+        return "STANDARD"
+
+    sim["sim_action"] = sim.apply(sim_action, axis=1)
+    before = sim["decision_action"].value_counts()
+    after = sim["sim_action"].value_counts()
+    impact = pd.DataFrame(
+        {
+            "Action": sorted(set(before.index) | set(after.index)),
+            "Before": [before.get(a, 0) for a in sorted(set(before.index) | set(after.index))],
+            "After": [after.get(a, 0) for a in sorted(set(before.index) | set(after.index))],
+        }
+    )
+    fig_impact = px.bar(impact, x="Action", y=["Before", "After"], barmode="group")
+    fig_impact.update_layout(height=360, margin=dict(l=5, r=5, t=10, b=5))
+    st.plotly_chart(fig_impact, use_container_width=True)
+
+    rev_before = sim["premium"].sum()
+    rev_after = sim["sim_premium"].sum()
+    profit_before = rev_before - sim["predicted_claim_cost"].sum()
+    profit_after = rev_after - sim["predicted_claim_cost"].sum()
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        kpi_card("Revenue impact", fmt_money(rev_after - rev_before), f"{premium_change:+d}% premium move")
+    with f2:
+        kpi_card("Profit impact", fmt_money(profit_after - profit_before), f"{fmt_money(profit_after)} simulated")
+    with f3:
+        kpi_card("Avg lapse after lift", fmt_pct(sim["sim_lapse_probability"].mean()), f"{retention_lift}% retention lift")
+
+with tab_records:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    panel_header("Customer-level risk view", f"top {top_n} by lapse probability")
+    records = filtered.sort_values("lapse_probability", ascending=False).head(top_n)
+    st.dataframe(
+        records[
+            [
+                "ID",
+                "age",
+                "gender",
+                "type_product",
+                "type_policy_dg",
+                "premium",
+                "predicted_claim_cost",
+                "lapse_probability",
+                "loss_ratio",
+                "decision_action",
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.caption(
+    "Portfolio Action Console | Team 54 MSDS 498 Capstone | Decision support only."
+)
