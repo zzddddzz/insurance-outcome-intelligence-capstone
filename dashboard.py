@@ -30,6 +30,17 @@ ACTION_LABELS = {
     "STANDARD": "Standard",
 }
 
+PLOT_ACTION_LABELS = {
+    "RETAIN_HIGH": "Retain",
+    "REVIEW_PRICING": "Reprice",
+    "EARLY_RISK": "Early risk",
+    "LOW_PRIORITY": "Low priority",
+    "STANDARD": "Standard",
+}
+PLOT_ACTION_COLORS = {
+    PLOT_ACTION_LABELS[action]: color for action, color in ACTION_COLORS.items()
+}
+
 ACTION_NOTES = {
     "RETAIN_HIGH": "High lapse risk and profitable. Prioritize retention outreach.",
     "REVIEW_PRICING": "Underpriced relative to expected claims. Review pricing.",
@@ -57,8 +68,8 @@ def add_css() -> None:
             --bg-rail: #fafbf9;
             --ink-1: #0e1a1f;
             --ink-2: #29363c;
-            --ink-3: #5d6970;
-            --ink-4: #8a949b;
+            --ink-3: #46565e;
+            --ink-4: #687780;
             --line-1: #dde0db;
             --line-2: #e8eae5;
             --teal: #2f6f67;
@@ -128,8 +139,8 @@ def add_css() -> None:
         }
 
         .brand-subtitle {
-            color: var(--ink-4);
-            font-size: 12px;
+            color: var(--ink-3);
+            font-size: 12.5px;
             line-height: 1.2;
         }
 
@@ -138,9 +149,10 @@ def add_css() -> None:
             background: #eef3ef;
             border: 1px solid var(--line-2);
             border-radius: 999px;
-            color: var(--ink-3);
+            color: var(--ink-2);
             display: inline-flex;
-            font-size: 12px;
+            font-size: 12.5px;
+            font-weight: 650;
             gap: 6px;
             padding: 3px 9px;
         }
@@ -154,8 +166,8 @@ def add_css() -> None:
         }
 
         .page-kicker {
-            color: var(--ink-4);
-            font-size: 12px;
+            color: var(--ink-3);
+            font-size: 12.5px;
             font-weight: 700;
             letter-spacing: 0.08em;
             margin-bottom: 3px;
@@ -186,8 +198,8 @@ def add_css() -> None:
         }
 
         .kpi-label {
-            color: var(--ink-4);
-            font-size: 11px;
+            color: var(--ink-3);
+            font-size: 11.5px;
             font-weight: 700;
             letter-spacing: 0.08em;
             line-height: 1.2;
@@ -203,8 +215,8 @@ def add_css() -> None:
         }
 
         .kpi-delta {
-            color: var(--ink-3);
-            font-size: 12px;
+            color: var(--ink-2);
+            font-size: 12.5px;
             line-height: 1.35;
             margin-top: 7px;
         }
@@ -223,8 +235,8 @@ def add_css() -> None:
             display: flex;
             gap: 10px;
             justify-content: space-between;
-            margin: -13px -14px 12px;
-            padding: 11px 14px;
+            margin: 0 0 12px;
+            padding: 0 0 10px;
         }
 
         .panel-title {
@@ -235,8 +247,9 @@ def add_css() -> None:
         }
 
         .panel-meta {
-            color: var(--ink-4);
-            font-size: 12px;
+            color: var(--ink-3);
+            font-size: 12.5px;
+            font-weight: 600;
             line-height: 1.35;
             text-align: right;
         }
@@ -245,7 +258,7 @@ def add_css() -> None:
             border: 1px solid;
             border-radius: 3px;
             display: inline-block;
-            font-size: 11px;
+            font-size: 11.5px;
             font-weight: 800;
             letter-spacing: 0.04em;
             padding: 2px 7px;
@@ -283,8 +296,8 @@ def add_css() -> None:
         }
 
         .mini-label {
-            color: var(--ink-4);
-            font-size: 10px;
+            color: var(--ink-3);
+            font-size: 10.5px;
             font-weight: 700;
             letter-spacing: 0.06em;
             text-transform: uppercase;
@@ -301,19 +314,48 @@ def add_css() -> None:
             background: var(--bg-card);
             border: 1px solid var(--line-1);
             border-radius: 5px;
-            gap: 0.25rem;
-            padding: 4px;
+            gap: 0.35rem;
+            padding: 5px;
         }
 
         div[role="radiogroup"] label {
+            border: 1px solid transparent;
             border-radius: 4px;
-            min-height: 32px;
-            padding: 3px 10px;
+            color: var(--ink-2) !important;
+            font-weight: 700;
+            min-height: 34px;
+            padding: 4px 12px;
+        }
+
+        div[role="radiogroup"] label p,
+        div[role="radiogroup"] label span,
+        div[role="radiogroup"] label div {
+            color: var(--ink-2) !important;
+            font-size: 15px !important;
+            font-weight: 700 !important;
         }
 
         div[role="radiogroup"] label:has(input:checked) {
-            background: var(--ink-1);
-            color: white;
+            background: var(--ink-1) !important;
+            border-color: var(--ink-1) !important;
+            box-shadow: 0 0 0 1px var(--ink-1);
+            color: #ffffff !important;
+        }
+
+        div[role="radiogroup"] label:has(input:checked) p,
+        div[role="radiogroup"] label:has(input:checked) span,
+        div[role="radiogroup"] label:has(input:checked) div {
+            color: #ffffff !important;
+        }
+
+        div[role="radiogroup"] input {
+            accent-color: var(--ink-1);
+        }
+
+        div[data-testid="stMultiSelect"] span,
+        div[data-testid="stSlider"] p {
+            color: var(--ink-2) !important;
+            font-weight: 650;
         }
 
         @media (max-width: 800px) {
@@ -523,11 +565,13 @@ selected_action = st.radio(
 if selected_action != "ALL":
     filtered = filtered[filtered["decision_action"] == selected_action].copy()
 empty_filter_guard(filtered)
+filtered["action_label"] = (
+    filtered["decision_action"].map(PLOT_ACTION_LABELS).fillna(filtered["decision_action"])
+)
 
 left, right = st.columns([1.35, 1])
 
 with left:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
     panel_header("Decision quadrant", "lapse risk x predicted claim cost")
     threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
     cost_median = filtered["predicted_claim_cost"].median()
@@ -537,10 +581,10 @@ with left:
         plot_sample,
         x="predicted_claim_cost",
         y="lapse_probability",
-        color="decision_action",
+        color="action_label",
         size="premium",
         size_max=18,
-        color_discrete_map=ACTION_COLORS,
+        color_discrete_map=PLOT_ACTION_COLORS,
         hover_data={
             "ID": True,
             "age": True,
@@ -550,12 +594,13 @@ with left:
             "predicted_claim_cost": ":$,.0f",
             "lapse_probability": ":.3f",
             "loss_ratio": ":.2f",
+            "action_label": False,
             "decision_action": True,
         },
         labels={
             "predicted_claim_cost": "Predicted claim cost",
             "lapse_probability": "Lapse probability",
-            "decision_action": "Action",
+            "action_label": "Action",
         },
     )
     fig.add_vline(x=cost_median, line_dash="dash", line_color="#8a949b")
@@ -566,15 +611,13 @@ with left:
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        font=dict(family="Inter Tight, Arial", color="#29363c"),
+        font=dict(family="Inter Tight, Arial", color="#29363c", size=14),
     )
-    fig.update_xaxes(gridcolor="#e8eae5")
-    fig.update_yaxes(gridcolor="#e8eae5", tickformat=".0%")
+    fig.update_xaxes(gridcolor="#e8eae5", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
+    fig.update_yaxes(gridcolor="#e8eae5", tickformat=".0%", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
     st.plotly_chart(fig, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 with right:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
     panel_header("Action mix", f"{fmt_int(filtered.shape[0])} records")
     action_counts = (
         filtered["decision_action"]
@@ -582,14 +625,15 @@ with right:
         .rename_axis("decision_action")
         .reset_index(name="count")
     )
+    action_counts["action_label"] = action_counts["decision_action"].map(PLOT_ACTION_LABELS)
     fig_mix = px.bar(
         action_counts,
         x="count",
-        y="decision_action",
+        y="action_label",
         orientation="h",
-        color="decision_action",
-        color_discrete_map=ACTION_COLORS,
-        labels={"count": "Records", "decision_action": ""},
+        color="action_label",
+        color_discrete_map=PLOT_ACTION_COLORS,
+        labels={"count": "Records", "action_label": ""},
     )
     fig_mix.update_layout(
         height=240,
@@ -597,10 +641,10 @@ with right:
         margin=dict(l=0, r=5, t=5, b=5),
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
-        font=dict(family="Inter Tight, Arial", color="#29363c"),
+        font=dict(family="Inter Tight, Arial", color="#29363c", size=14),
     )
-    fig_mix.update_xaxes(gridcolor="#e8eae5")
-    fig_mix.update_yaxes(categoryorder="total ascending")
+    fig_mix.update_xaxes(gridcolor="#e8eae5", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
+    fig_mix.update_yaxes(categoryorder="total ascending", tickfont=dict(size=13, color="#46565e"))
     st.plotly_chart(fig_mix, use_container_width=True)
     for action in action_counts["decision_action"].tolist():
         st.markdown(
@@ -608,7 +652,6 @@ with right:
             f"<span style='color:#5d6970;font-size:13px'>{ACTION_NOTES.get(action, '')}</span>",
             unsafe_allow_html=True,
         )
-    st.markdown("</div>", unsafe_allow_html=True)
 
 seg_filtered = seg_summary[
     seg_summary["type_product"].isin(products)
@@ -617,13 +660,10 @@ seg_filtered = seg_summary[
 
 rank_col, detail_col = st.columns([1, 1])
 with rank_col:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
     panel_header("Ranked segments", f"{len(seg_filtered)} active segments")
     segment_cards(seg_filtered)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 with detail_col:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
     panel_header("Segment table", "sortable, filter-aware")
     segment_table = seg_filtered.rename(
         columns={
@@ -644,7 +684,6 @@ with detail_col:
         use_container_width=True,
         hide_index=True,
     )
-    st.markdown("</div>", unsafe_allow_html=True)
 
 tab_overview, tab_model, tab_sim, tab_records = st.tabs(
     ["Portfolio trends", "Model evidence", "Simulator", "Customer records"]
@@ -653,7 +692,6 @@ tab_overview, tab_model, tab_sim, tab_records = st.tabs(
 with tab_overview:
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
         panel_header("Risk by age group", "book-level summary")
         fig_age = px.bar(
             age_summary,
@@ -666,9 +704,7 @@ with tab_overview:
         fig_age.update_layout(height=330, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
         fig_age.update_yaxes(tickformat=".0%")
         st.plotly_chart(fig_age, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
     with c2:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
         panel_header("Premium vs claim distribution", "current filtered view")
         fig_hist = go.Figure()
         fig_hist.add_trace(go.Histogram(x=filtered["premium"], name="Premium", opacity=0.72, marker_color="#315f86"))
@@ -680,7 +716,6 @@ with tab_overview:
             legend=dict(orientation="h"),
         )
         st.plotly_chart(fig_hist, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
 with tab_model:
     lapse_val = model_summary["lapse_model"]["val"]
@@ -757,7 +792,6 @@ with tab_sim:
         kpi_card("Avg lapse after lift", fmt_pct(sim["sim_lapse_probability"].mean()), f"{retention_lift}% retention lift")
 
 with tab_records:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
     panel_header("Customer-level risk view", f"top {top_n} by lapse probability")
     records = filtered.sort_values("lapse_probability", ascending=False).head(top_n)
     st.dataframe(
@@ -778,7 +812,6 @@ with tab_records:
         use_container_width=True,
         hide_index=True,
     )
-    st.markdown("</div>", unsafe_allow_html=True)
 
 st.caption(
     "Portfolio Action Console | Team 54 MSDS 498 Capstone | Decision support only."
