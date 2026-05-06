@@ -48,6 +48,15 @@ streamlit run dashboard.py --server.port 8502 --server.headless true
 
 Then open: **http://localhost:8502**
 
+### Streamlit Community Cloud
+
+Use these fields when deploying:
+
+- Repository: `zzddddzz/insurance-outcome-intelligence-capstone`
+- Branch: `main`
+- Main file path: `streamlit_app.py`
+- App URL suggestion: `insurance-outcome-intelligence-capstone`
+
 ## Project Structure
 
 ```
