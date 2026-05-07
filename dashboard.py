@@ -671,13 +671,13 @@ pricing_segments = seg_summary[
 priority_records = retain_view.shape[0] + early_view.shape[0]
 retention_premium = retain_view["premium"].sum()
 early_expected_claim = early_view["expected_claim_cost"].sum()
-lapse_auc = model_summary["lapse_model"]["test"]["roc_auc"]
-lapse_recall = model_summary["lapse_model"]["test"]["recall"]
-pricing_note = (
-    f"{fmt_int(pricing_segments.shape[0])} segment also needs pricing review."
-    if not pricing_segments.empty
-    else "No selected segment currently exceeds the pricing review threshold."
-)
+pricing_count = pricing_segments.shape[0]
+if pricing_count == 1:
+    pricing_note = "One segment should move to pricing review."
+elif pricing_count > 1:
+    pricing_note = f"{fmt_int(pricing_count)} segments should move to pricing review."
+else:
+    pricing_note = "No selected segment currently needs pricing review."
 
 st.markdown(
     """
@@ -689,19 +689,19 @@ st.markdown(
                 <div class="brand-subtitle">Executive portfolio decision support</div>
             </div>
         </div>
-        <span class="live-pill">decision-ready</span>
+        <span class="live-pill">portfolio view</span>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="page-kicker">Executive brief · Q3 2026</div>', unsafe_allow_html=True)
-st.markdown('<h1 class="page-title">Retention and claim-risk action plan</h1>', unsafe_allow_html=True)
+st.markdown('<div class="page-kicker">Q3 2026 portfolio review</div>', unsafe_allow_html=True)
+st.markdown('<h1 class="page-title">Protect revenue and reduce claim exposure</h1>', unsafe_allow_html=True)
 st.markdown(
     f"""
     <p class="page-copy">
     {fmt_int(filtered["ID_policy"].nunique())} policies in view ·
-    {fmt_int(filtered.shape[0])} evaluated customer records · recommended actions ranked by business value and operational urgency.
+    {fmt_int(filtered.shape[0])} customer records evaluated · actions prioritized by expected financial impact.
     </p>
     """,
     unsafe_allow_html=True,
@@ -710,12 +710,12 @@ st.markdown(
 st.markdown(
     f"""
     <div class="exec-brief">
-        <div class="exec-eyebrow">CEO recommendation</div>
-        <div class="exec-title">Approve a targeted retention push for profitable high-lapse customers and route high-claim exposure to early intervention.</div>
+        <div class="exec-eyebrow">Recommended action</div>
+        <div class="exec-title">Protect {fmt_money(retention_premium)} in premium at risk while addressing {fmt_money(early_expected_claim)} in expected claim exposure.</div>
         <div class="exec-copy">
-        The current portfolio view identifies {fmt_int(priority_records)} priority customers:
-        {fmt_int(retain_view.shape[0])} profitable customers to retain and {fmt_int(early_view.shape[0])}
-        high-claim-risk customers to manage before losses materialize. {pricing_note}
+        Start with {fmt_int(priority_records)} priority customers:
+        {fmt_int(retain_view.shape[0])} profitable customers likely to lapse and {fmt_int(early_view.shape[0])}
+        high-claim-risk customers for early intervention. {pricing_note}
         </div>
     </div>
     """,
@@ -726,24 +726,24 @@ st.markdown(
     f"""
     <div class="exec-grid">
         <div class="exec-card">
-            <div class="exec-label">Decision ask</div>
-            <div class="exec-value">Fund targeted outreach</div>
-            <div class="exec-note">Focus retention spend on customers with high lapse risk and positive margin.</div>
+            <div class="exec-label">Next move</div>
+            <div class="exec-value">Launch focused outreach</div>
+            <div class="exec-note">Direct retention spend to customers with the clearest business upside.</div>
         </div>
         <div class="exec-card">
             <div class="exec-label">Premium at risk</div>
             <div class="exec-value">{fmt_money(retention_premium)}</div>
-            <div class="exec-note">{fmt_int(retain_view.shape[0])} profitable high-lapse customers.</div>
+            <div class="exec-note">{fmt_int(retain_view.shape[0])} profitable customers likely to lapse.</div>
         </div>
         <div class="exec-card">
             <div class="exec-label">Claim exposure</div>
             <div class="exec-value">{fmt_money(early_expected_claim)}</div>
-            <div class="exec-note">{fmt_int(early_view.shape[0])} customers routed to early intervention.</div>
+            <div class="exec-note">{fmt_int(early_view.shape[0])} customers flagged for early intervention.</div>
         </div>
         <div class="exec-card">
-            <div class="exec-label">Model confidence</div>
-        <div class="exec-value">Strong signal</div>
-        <div class="exec-note">{lapse_auc:.3f} risk-ranking score; {lapse_recall:.1%} high-risk capture.</div>
+            <div class="exec-label">Decision confidence</div>
+            <div class="exec-value">Validated signal</div>
+            <div class="exec-note">Risk ranking and high-risk capture hold up on unseen cases.</div>
         </div>
     </div>
     """,
