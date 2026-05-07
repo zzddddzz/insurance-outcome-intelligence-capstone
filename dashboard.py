@@ -119,6 +119,11 @@ def add_css() -> None:
 
         #MainMenu, footer, [data-testid="stDecoration"] { display: none !important; }
         header[data-testid="stHeader"] { display: none !important; }
+        div[data-testid="stPlotlyChart"] .modebar-container,
+        div[data-testid="stPlotlyChart"] .modebar {
+            display: none !important;
+            pointer-events: none !important;
+        }
 
         .stApp {
             background: var(--bg-page);
