@@ -710,7 +710,7 @@ st.markdown(
 st.markdown(
     f"""
     <div class="exec-brief">
-        <div class="exec-eyebrow">Revenue protection focus</div>
+        <div class="exec-eyebrow">Where the exposure is</div>
         <div class="exec-title">Protect {fmt_money(retention_premium)} in premium at risk while addressing {fmt_money(early_expected_claim)} in expected claim exposure.</div>
         <div class="exec-copy">
         Start with {fmt_int(priority_records)} priority customers:
@@ -726,7 +726,7 @@ st.markdown(
     f"""
     <div class="exec-grid">
         <div class="exec-card">
-            <div class="exec-label">Retention focus</div>
+            <div class="exec-label">Where to start</div>
             <div class="exec-value">Launch focused outreach</div>
             <div class="exec-note">Direct retention spend to customers with the clearest business upside.</div>
         </div>
@@ -742,8 +742,8 @@ st.markdown(
         </div>
         <div class="exec-card">
             <div class="exec-label">Confidence</div>
-            <div class="exec-value">Clear signal</div>
-            <div class="exec-note">Risk ranking and high-risk capture hold up on unseen cases.</div>
+            <div class="exec-value">Reliable for prioritization</div>
+            <div class="exec-note">The ranking is stable enough to guide outreach and intervention sequencing.</div>
         </div>
     </div>
     """,
@@ -1054,5 +1054,5 @@ with tab_records:
     )
 
 st.caption(
-    "Insurance Outcome Intelligence | Portfolio planning view | Illustrative analysis for management review."
+    "Insurance Outcome Intelligence | Planning view for management discussion."
 )
