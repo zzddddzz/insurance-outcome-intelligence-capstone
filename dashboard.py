@@ -659,6 +659,12 @@ def fmt_pct(value: float) -> str:
     return f"{value * 100:.1f}%"
 
 
+def fmt_share_pct(value: float) -> str:
+    if 0 < value < 0.001:
+        return "<0.1%"
+    return fmt_pct(value)
+
+
 def product_label(value: str) -> str:
     return PRODUCT_LABELS.get(str(value), str(value))
 
@@ -1038,18 +1044,19 @@ with right:
         queue_count = filtered.shape[0]
         queue_total = max(portfolio_view.shape[0], 1)
         queue_share = min(queue_count / queue_total, 1)
+        queue_fill_width = max(queue_share * 100, 1.5 if queue_count else 0)
         queue_color = ACTION_COLORS.get(selected_action, "#2f6f67")
         st.markdown(
             f"""
             <div class="queue-summary" style="--queue-color:{queue_color};">
                 <div class="queue-topline">
                     {action_chip(selected_action)}
-                    <div class="panel-meta">{fmt_pct(queue_share)} of current portfolio</div>
+                    <div class="panel-meta">{fmt_share_pct(queue_share)} of current portfolio</div>
                 </div>
                 <div class="queue-count">{fmt_int(queue_count)}</div>
                 <div class="queue-caption">records in this action queue</div>
                 <div class="queue-track">
-                    <div class="queue-fill" style="width:{queue_share * 100:.1f}%"></div>
+                    <div class="queue-fill" style="width:{queue_fill_width:.1f}%"></div>
                 </div>
                 <div class="queue-note">{ACTION_NOTES.get(selected_action, '')}</div>
             </div>
