@@ -701,7 +701,7 @@ st.markdown(
     f"""
     <p class="page-copy">
     {fmt_int(filtered["ID_policy"].nunique())} policies in view ·
-    {fmt_int(filtered.shape[0])} customer records evaluated · actions prioritized by expected financial impact.
+    {fmt_int(filtered.shape[0])} customers evaluated · actions prioritized by expected financial impact.
     </p>
     """,
     unsafe_allow_html=True,
@@ -784,7 +784,7 @@ filtered["action_label"] = (
 left, right = st.columns([1.35, 1])
 
 with left:
-    panel_header("Lapse risk vs claim exposure", "each point is a customer record")
+    panel_header("Lapse risk vs claim exposure", "each point is one customer")
     threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
     cost_median = filtered["expected_claim_cost"].median()
 
@@ -906,8 +906,8 @@ with detail_col:
         height=492,
     )
 
-tab_overview, tab_model, tab_sim, tab_records = st.tabs(
-    ["Portfolio outlook", "Confidence", "Planning", "Action list"]
+tab_overview, tab_model, tab_sim, tab_records, tab_appendix = st.tabs(
+    ["Portfolio outlook", "Confidence", "Planning", "Action list", "Appendix"]
 )
 
 with tab_overview:
@@ -1045,6 +1045,296 @@ with tab_records:
         records_display,
         column_config={
             "Premium": st.column_config.NumberColumn("Premium", format="$%d"),
+            "Expected claim": st.column_config.NumberColumn("Expected claim", format="$%d"),
+            "Lapse risk": st.column_config.NumberColumn("Lapse risk", format="%.1f%%"),
+            "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
+        },
+        use_container_width=True,
+        hide_index=True,
+    )
+
+with tab_appendix:
+    st.markdown(
+        "Deeper diagnostics for review. The sidebar filters and action category selection apply here too."
+    )
+
+    diag_l, diag_r = st.columns(2)
+    with diag_l:
+        panel_header("Premium distribution", "filtered portfolio")
+        fig_prem = px.histogram(
+            filtered,
+            x="premium",
+            nbins=50,
+            color_discrete_sequence=["#315f86"],
+            labels={"premium": "Annual premium"},
+        )
+        fig_prem.update_layout(
+            height=320,
+            showlegend=False,
+            margin=dict(l=5, r=5, t=5, b=5),
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            yaxis_title="Records",
+        )
+        st.plotly_chart(fig_prem, use_container_width=True)
+
+    with diag_r:
+        panel_header("Expected claim distribution", "filtered portfolio")
+        fig_claim = px.histogram(
+            filtered,
+            x="expected_claim_cost",
+            nbins=50,
+            color_discrete_sequence=["#b9484a"],
+            labels={"expected_claim_cost": "Expected claim"},
+        )
+        fig_claim.update_layout(
+            height=320,
+            showlegend=False,
+            margin=dict(l=5, r=5, t=5, b=5),
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            yaxis_title="Records",
+        )
+        st.plotly_chart(fig_claim, use_container_width=True)
+
+    seg_l, seg_r = st.columns(2)
+    with seg_l:
+        panel_header("Lapse by product and policy", "filtered segments")
+        seg_diag = seg_filtered.copy()
+        seg_diag["Product"] = seg_diag["type_product"].map(product_label)
+        seg_diag["Policy"] = seg_diag["type_policy_dg"].map(policy_label)
+        fig_lapse = px.bar(
+            seg_diag,
+            x="Product",
+            y="lapse_rate",
+            color="Policy",
+            barmode="group",
+            labels={"lapse_rate": "Lapse rate"},
+            color_discrete_sequence=["#315f86", "#b9484a", "#2f6f67", "#c08a2d", "#76629c", "#687780"],
+        )
+        fig_lapse.update_layout(
+            height=340,
+            margin=dict(l=5, r=5, t=5, b=5),
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        )
+        fig_lapse.update_yaxes(tickformat=".0%")
+        st.plotly_chart(fig_lapse, use_container_width=True)
+
+    with seg_r:
+        panel_header("Segment heatmap", "average lapse rate")
+        heat_data = (
+            filtered.groupby(["product_display", "policy_display"], observed=False)
+            .agg(lapse_rate=("lapse_probability", "mean"))
+            .reset_index()
+        )
+        pivot = heat_data.pivot(index="product_display", columns="policy_display", values="lapse_rate")
+        heat_text = pivot.copy()
+        for column in heat_text.columns:
+            heat_text[column] = heat_text[column].map(
+                lambda value: "" if pd.isna(value) else f"{value:.1%}"
+            )
+        fig_heat = go.Figure(
+            data=go.Heatmap(
+                z=pivot.values,
+                x=pivot.columns.tolist(),
+                y=pivot.index.tolist(),
+                text=heat_text.values,
+                texttemplate="%{text}",
+                colorscale="RdYlGn_r",
+                colorbar=dict(title="Lapse"),
+            )
+        )
+        fig_heat.update_layout(
+            height=340,
+            margin=dict(l=5, r=5, t=5, b=5),
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            xaxis_title="Policy",
+            yaxis_title="Product",
+        )
+        st.plotly_chart(fig_heat, use_container_width=True)
+
+    age_l, age_r = st.columns(2)
+    age_diag = (
+        filtered.groupby("age_group", observed=False)
+        .agg(lapse_rate=("lapse_probability", "mean"), avg_claim=("expected_claim_cost", "mean"))
+        .reset_index()
+    )
+    age_order = age_summary["age_group"].tolist()
+    age_diag["age_group"] = pd.Categorical(age_diag["age_group"], categories=age_order, ordered=True)
+    age_diag = age_diag.sort_values("age_group")
+    with age_l:
+        panel_header("Lapse by age group", "filtered portfolio")
+        fig_age_lapse = px.bar(
+            age_diag,
+            x="age_group",
+            y="lapse_rate",
+            color="lapse_rate",
+            color_continuous_scale="Reds",
+            labels={"age_group": "Age group", "lapse_rate": "Lapse rate"},
+        )
+        fig_age_lapse.update_layout(height=320, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
+        fig_age_lapse.update_yaxes(tickformat=".0%")
+        st.plotly_chart(fig_age_lapse, use_container_width=True)
+    with age_r:
+        panel_header("Claim exposure by age group", "filtered portfolio")
+        fig_age_claim = px.bar(
+            age_diag,
+            x="age_group",
+            y="avg_claim",
+            color="avg_claim",
+            color_continuous_scale="Blues",
+            labels={"age_group": "Age group", "avg_claim": "Expected claim"},
+        )
+        fig_age_claim.update_layout(height=320, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
+        st.plotly_chart(fig_age_claim, use_container_width=True)
+
+    panel_header("Work queue detail", "filtered action split")
+    action_detail = (
+        filtered.groupby("decision_action", observed=False)
+        .agg(
+            Records=("ID", "count"),
+            Premium=("premium", "mean"),
+            Claim=("expected_claim_cost", "mean"),
+            Lapse=("lapse_probability", "mean"),
+            Loss=("loss_ratio", "mean"),
+        )
+        .reset_index()
+    )
+    action_detail["Action"] = action_detail["decision_action"].map(ACTION_LABELS)
+    action_detail["Portfolio"] = action_detail["Records"] / action_detail["Records"].sum() * 100
+    action_detail["Lapse"] = action_detail["Lapse"] * 100
+    action_detail["Operating note"] = action_detail["decision_action"].map(ACTION_NOTES)
+    action_detail = action_detail[
+        ["Action", "Records", "Portfolio", "Premium", "Claim", "Lapse", "Loss", "Operating note"]
+    ].sort_values("Records", ascending=False)
+    st.dataframe(
+        action_detail,
+        column_config={
+            "Records": st.column_config.NumberColumn("Records", format="%d"),
+            "Portfolio": st.column_config.NumberColumn("Portfolio", format="%.1f%%"),
+            "Premium": st.column_config.NumberColumn("Premium", format="$%d"),
+            "Claim": st.column_config.NumberColumn("Claim", format="$%d"),
+            "Lapse": st.column_config.NumberColumn("Lapse", format="%.1f%%"),
+            "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
+        },
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    metric_tabs = st.tabs(["Lapse model", "Claim forecast"])
+    with metric_tabs[0]:
+        lapse_val = model_summary["lapse_model"]["val"]
+        lapse_test = model_summary["lapse_model"]["test"]
+        v1, v2, v3, v4, v5 = st.columns(5)
+        with v1:
+            kpi_card("Validation accuracy", f"{lapse_val['accuracy']:.4f}", "lapse classifier")
+        with v2:
+            kpi_card("Validation precision", f"{lapse_val['precision']:.4f}", "high-risk flag")
+        with v3:
+            kpi_card("Validation recall", f"{lapse_val['recall']:.4f}", "high-risk coverage")
+        with v4:
+            kpi_card("Validation F1", f"{lapse_val['f1']:.4f}", "balanced score")
+        with v5:
+            kpi_card("Test ROC AUC", f"{lapse_test['roc_auc']:.4f}", "unseen cases")
+
+        feat_path = ROOT / "output" / "feature_importance.csv"
+        if feat_path.exists():
+            feat = pd.read_csv(feat_path).head(15).copy()
+            feat["Driver"] = feat["feature"].map(business_feature_label)
+            feat_plot = feat.sort_values("importance")
+            fig_feat = px.bar(
+                feat_plot,
+                x="importance",
+                y="Driver",
+                orientation="h",
+                color_discrete_sequence=["#2f6f67"],
+                labels={"importance": "Importance", "Driver": ""},
+            )
+            fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5))
+            st.plotly_chart(fig_feat, use_container_width=True)
+            st.dataframe(
+                feat.rename(columns={"importance": "Importance"})[["Driver", "Importance"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    with metric_tabs[1]:
+        claim_val = model_summary["claim_model"].get("val", model_summary["claim_model"])
+        claim_test = model_summary["claim_model"].get("test", claim_val)
+        c1, c2, c3, c4, c5 = st.columns(5)
+        with c1:
+            kpi_card("Validation RMSE", fmt_money(claim_val["rmse"]), "claim forecast")
+        with c2:
+            kpi_card("Validation MAE", fmt_money(claim_val["mae"]), "typical error")
+        with c3:
+            kpi_card("Validation R²", f"{claim_val['r2']:.4f}", "fit score")
+        with c4:
+            kpi_card("Validation MAPE", f"{claim_val['mape']:.2f}%", "percent error")
+        with c5:
+            kpi_card("Test R²", f"{claim_test['r2']:.4f}", "unseen cases")
+
+        claim_feat_path = ROOT / "output" / "claim_feature_importance.csv"
+        if claim_feat_path.exists():
+            claim_feat = pd.read_csv(claim_feat_path).head(15).copy()
+            claim_feat["Driver"] = claim_feat["feature"].map(business_feature_label)
+            claim_feat_plot = claim_feat.sort_values("importance")
+            fig_claim_feat = px.bar(
+                claim_feat_plot,
+                x="importance",
+                y="Driver",
+                orientation="h",
+                color_discrete_sequence=["#315f86"],
+                labels={"importance": "Importance", "Driver": ""},
+            )
+            fig_claim_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5))
+            st.plotly_chart(fig_claim_feat, use_container_width=True)
+            st.dataframe(
+                claim_feat.rename(columns={"importance": "Importance"})[["Driver", "Importance"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    panel_header("Scenario financial detail", "uses the planning controls")
+    s1, s2, s3, s4, s5 = st.columns(5)
+    with s1:
+        kpi_card("Original revenue", fmt_money(rev_before), "filtered portfolio")
+    with s2:
+        kpi_card("Simulated revenue", fmt_money(rev_after), f"{premium_change:+d}% premium move")
+    with s3:
+        kpi_card("Original profit", fmt_money(profit_before), "before changes")
+    with s4:
+        kpi_card("Simulated profit", fmt_money(profit_after), "after changes")
+    with s5:
+        profit_pct = (profit_after / profit_before - 1) * 100 if profit_before else 0
+        kpi_card("Profit change", fmt_money(profit_after - profit_before), f"{profit_pct:+.1f}%")
+
+    panel_header("Filtered risk sample", f"top {top_n} by lapse risk")
+    appendix_records = filtered.sort_values("lapse_probability", ascending=False).head(top_n).copy()
+    appendix_display = pd.DataFrame(
+        {
+            "Customer": appendix_records["ID"],
+            "Policy": appendix_records["ID_policy"],
+            "Age": appendix_records["age"],
+            "Gender": appendix_records["gender_display"],
+            "Product": appendix_records["product_display"],
+            "Policy group": appendix_records["policy_display"],
+            "Channel": appendix_records["channel_display"],
+            "Premium": appendix_records["premium"],
+            "Actual claims": appendix_records["cost_claims_year"],
+            "Expected claim": appendix_records["expected_claim_cost"],
+            "Lapse risk": appendix_records["lapse_probability"] * 100,
+            "Loss": appendix_records["loss_ratio"],
+            "Action": appendix_records["decision_action"].map(ACTION_LABELS),
+        }
+    )
+    st.dataframe(
+        appendix_display,
+        column_config={
+            "Premium": st.column_config.NumberColumn("Premium", format="$%d"),
+            "Actual claims": st.column_config.NumberColumn("Actual claims", format="$%d"),
             "Expected claim": st.column_config.NumberColumn("Expected claim", format="$%d"),
             "Lapse risk": st.column_config.NumberColumn("Lapse risk", format="%.1f%%"),
             "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
