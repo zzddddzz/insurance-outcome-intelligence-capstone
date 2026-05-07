@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 
 ROOT = Path(__file__).resolve().parent
@@ -467,6 +468,21 @@ def add_css() -> None:
             font-weight: 650;
         }
 
+        .stTabs {
+            overflow-anchor: none;
+        }
+
+        .stTabs [role="tablist"] {
+            background: var(--bg-page);
+            min-height: 46px;
+            overflow-anchor: none;
+        }
+
+        .stTabs [role="tabpanel"] {
+            min-height: clamp(520px, 70vh, 680px);
+            overflow-anchor: none;
+        }
+
         @media (max-width: 800px) {
             .topbar { align-items: flex-start; gap: 10px; }
             .exec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -481,6 +497,55 @@ def add_css() -> None:
         </style>
         """,
         unsafe_allow_html=True,
+    )
+
+
+def add_tab_scroll_guard() -> None:
+    components.html(
+        """
+        <script>
+        (() => {
+          const appWindow = window.parent;
+          const appDocument = appWindow.document;
+          if (appWindow.__portfolioTabScrollGuard) return;
+          appWindow.__portfolioTabScrollGuard = true;
+
+          const isOuterTabs = (tab) => {
+            const tabList = tab && tab.closest ? tab.closest('[role="tablist"]') : null;
+            if (!tabList) return false;
+            const text = tabList.textContent || "";
+            return text.includes("Portfolio outlook")
+              && text.includes("Confidence")
+              && text.includes("Planning")
+              && text.includes("Action list")
+              && text.includes("Appendix");
+          };
+
+          const restoreScroll = (top, left) => {
+            appWindow.requestAnimationFrame(() => appWindow.scrollTo(left, top));
+            appWindow.setTimeout(() => appWindow.scrollTo(left, top), 80);
+            appWindow.setTimeout(() => appWindow.scrollTo(left, top), 220);
+          };
+
+          const rememberPosition = (event) => {
+            const tab = event.target && event.target.closest
+              ? event.target.closest('[role="tab"]')
+              : null;
+            if (!isOuterTabs(tab)) return;
+            restoreScroll(appWindow.scrollY, appWindow.scrollX);
+          };
+
+          appDocument.addEventListener("pointerdown", rememberPosition, true);
+          appDocument.addEventListener("click", rememberPosition, true);
+          appDocument.addEventListener("keydown", (event) => {
+            if (!["Enter", " "].includes(event.key)) return;
+            rememberPosition(event);
+          }, true);
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
     )
 
 
@@ -612,6 +677,7 @@ def empty_filter_guard(frame: pd.DataFrame) -> None:
 
 
 add_css()
+add_tab_scroll_guard()
 df, seg_summary, decision_summary, age_summary, model_summary = load_data()
 
 st.markdown(
