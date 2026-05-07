@@ -733,6 +733,27 @@ def amount_distribution_ceiling(frame: pd.DataFrame) -> float:
     return float(max(500, math.ceil(values.quantile(0.99) / 500) * 500))
 
 
+def nice_record_axis(max_value: float, min_ceiling: int = 16000, target_ticks: int = 5) -> tuple[int, int]:
+    if max_value <= 0:
+        return min_ceiling, 2000
+
+    rough_tick = max_value / max(target_ticks, 1)
+    magnitude = 10 ** math.floor(math.log10(rough_tick))
+    residual = rough_tick / magnitude
+    if residual <= 1:
+        tick = magnitude
+    elif residual <= 2:
+        tick = 2 * magnitude
+    elif residual <= 5:
+        tick = 5 * magnitude
+    else:
+        tick = 10 * magnitude
+
+    tick = int(max(tick, 2000))
+    ceiling = int(math.ceil(max_value / tick) * tick)
+    return max(ceiling, min_ceiling), tick
+
+
 def amount_distribution_figure(frame: pd.DataFrame, ceiling: float) -> go.Figure:
     bin_size = max(50, ceiling / 45)
     fig = go.Figure()
@@ -1505,12 +1526,21 @@ with tab_sim:
         labels={"Action": "Action", "Records": "Records"},
         color_discrete_map={"Before": "#cfd6d8", "After": "#146c94"},
     )
-    planning_axis_records = max(int(before.max()) if not before.empty else 1, 1)
-    planning_axis_max = max(16000, ((planning_axis_records * 115 + 99999) // 100000) * 1000)
+    planning_axis_records = max(
+        int(impact[["Before", "After"]].to_numpy().max()) if not impact.empty else 1,
+        1,
+    )
+    planning_axis_max, planning_axis_tick = nice_record_axis(planning_axis_records * 1.15)
     fig_impact.update_layout(
         height=360,
-        margin=dict(l=5, r=5, t=10, b=5),
-        yaxis=dict(range=[0, planning_axis_max], tickmode="linear", dtick=2000),
+        margin=dict(l=12, r=5, t=10, b=5),
+        yaxis=dict(
+            range=[0, planning_axis_max],
+            tickmode="linear",
+            dtick=planning_axis_tick,
+            tickformat="~s",
+            separatethousands=True,
+        ),
     )
     fig_impact.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False)
     st.plotly_chart(fig_impact, width="stretch")
