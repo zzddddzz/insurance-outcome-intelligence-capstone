@@ -13,6 +13,13 @@ import streamlit.components.v1 as components
 
 
 ROOT = Path(__file__).resolve().parent
+FULL_PREDICTIONS_PATH = ROOT / "output" / "predictions_full.csv.gz"
+SAMPLE_PREDICTIONS_PATH = ROOT / "output" / "predictions_sample.csv"
+
+DATA_SCOPE_LABELS = {
+    "FULL": "Full portfolio",
+    "SAMPLE": "Fast preview",
+}
 
 ACTION_COLORS = {
     "RETAIN_HIGH": "#2f7d51",
@@ -207,6 +214,18 @@ def add_css() -> None:
             content: "";
             height: 7px;
             width: 7px;
+        }
+
+        .scope-note {
+            color: var(--ink-3);
+            font-size: 12.5px;
+            line-height: 1.35;
+            padding-top: 28px;
+        }
+
+        .scope-note strong {
+            color: var(--ink-1);
+            font-weight: 750;
         }
 
         .page-kicker {
@@ -633,14 +652,40 @@ def add_tab_scroll_guard() -> None:
     )
 
 
+def available_data_scopes() -> list[str]:
+    scopes = []
+    if FULL_PREDICTIONS_PATH.exists():
+        scopes.append("FULL")
+    if SAMPLE_PREDICTIONS_PATH.exists():
+        scopes.append("SAMPLE")
+    return scopes
+
+
 @st.cache_data(ttl=3600)
-def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
-    predictions = pd.read_csv(ROOT / "output" / "predictions_sample.csv")
+def load_data(data_scope: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict, dict]:
+    if data_scope == "FULL" and FULL_PREDICTIONS_PATH.exists():
+        prediction_path = FULL_PREDICTIONS_PATH
+        resolved_scope = "FULL"
+    elif SAMPLE_PREDICTIONS_PATH.exists():
+        prediction_path = SAMPLE_PREDICTIONS_PATH
+        resolved_scope = "SAMPLE"
+    elif FULL_PREDICTIONS_PATH.exists():
+        prediction_path = FULL_PREDICTIONS_PATH
+        resolved_scope = "FULL"
+    else:
+        raise FileNotFoundError("No dashboard prediction artifact found in output/.")
+
+    predictions = pd.read_csv(prediction_path)
     segments = pd.read_csv(ROOT / "output" / "segment_summary.csv")
     decisions = pd.read_csv(ROOT / "output" / "decision_summary.csv")
     ages = pd.read_csv(ROOT / "output" / "age_summary.csv")
     model_summary = json.loads((ROOT / "output" / "model_summary.json").read_text())
-    return predictions, segments, decisions, ages, model_summary
+    data_source = {
+        "scope": resolved_scope,
+        "path": str(prediction_path.relative_to(ROOT)),
+        "records": int(predictions.shape[0]),
+    }
+    return predictions, segments, decisions, ages, model_summary, data_source
 
 
 def fmt_int(value: float) -> str:
@@ -670,6 +715,10 @@ def fmt_share_pct(value: float) -> str:
     return fmt_pct(value)
 
 
+def records_text(value: float) -> str:
+    return f"{fmt_int(value)} modeled records"
+
+
 def product_label(value: str) -> str:
     return PRODUCT_LABELS.get(str(value), str(value))
 
@@ -696,6 +745,54 @@ def action_chip(action: str) -> str:
         f'<span class="action-chip chip-{css}">'
         f"{ACTION_LABELS.get(action, action)}</span>"
     )
+
+
+def summarize_segments(frame: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "type_product", "type_policy_dg", "count", "avg_premium", "avg_claim",
+        "lapse_rate", "avg_loss_ratio", "avg_age", "loss_ratio",
+    ]
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+
+    claim_col = "expected_claim_cost" if "expected_claim_cost" in frame.columns else "cost_claims_year"
+    summary = (
+        frame.groupby(["type_product", "type_policy_dg"], observed=False)
+        .agg(
+            count=("ID", "count"),
+            avg_premium=("premium", "mean"),
+            avg_claim=(claim_col, "mean"),
+            lapse_rate=("lapse_probability", "mean"),
+            avg_loss_ratio=("loss_ratio", "mean"),
+            avg_age=("age", "mean"),
+        )
+        .reset_index()
+    )
+    summary["loss_ratio"] = summary["avg_claim"] / summary["avg_premium"].clip(lower=1)
+    return summary
+
+
+def summarize_age(frame: pd.DataFrame, age_order: list[str]) -> pd.DataFrame:
+    columns = ["age_group", "count", "avg_premium", "avg_claim", "lapse_rate", "loss_ratio"]
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+
+    claim_col = "expected_claim_cost" if "expected_claim_cost" in frame.columns else "cost_claims_year"
+    summary = (
+        frame.groupby("age_group", observed=False)
+        .agg(
+            count=("ID", "count"),
+            avg_premium=("premium", "mean"),
+            avg_claim=(claim_col, "mean"),
+            lapse_rate=("lapse_probability", "mean"),
+            loss_ratio=("loss_ratio", "mean"),
+        )
+        .reset_index()
+    )
+    if age_order:
+        summary["age_group"] = pd.Categorical(summary["age_group"], categories=age_order, ordered=True)
+        summary = summary.sort_values("age_group")
+    return summary
 
 
 def panel_header(title: str, meta: str = "") -> None:
@@ -768,7 +865,6 @@ def empty_filter_guard(frame: pd.DataFrame) -> None:
 
 add_css()
 add_tab_scroll_guard()
-df, seg_summary, decision_summary, age_summary, model_summary = load_data()
 
 st.markdown(
     """
@@ -785,6 +881,43 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+data_scopes = available_data_scopes()
+if not data_scopes:
+    st.error("No dashboard prediction artifact found in output/. Run the training pipeline first.")
+    st.stop()
+
+default_scope = "FULL" if "FULL" in data_scopes else data_scopes[0]
+scope_control, scope_note = st.columns([0.55, 1.45])
+with scope_control:
+    data_scope = st.segmented_control(
+        "Portfolio scope",
+        data_scopes,
+        default=default_scope,
+        format_func=lambda value: DATA_SCOPE_LABELS[value],
+        required=True,
+        width="content",
+    )
+
+df, seg_summary, decision_summary, age_summary, model_summary, data_source = load_data(data_scope)
+full_record_count = int(model_summary.get("total_records") or model_summary.get("data_shape", [len(df)])[0])
+with scope_note:
+    scope_label = DATA_SCOPE_LABELS[data_source["scope"]]
+    if data_source["scope"] == "FULL":
+        source_line = f"{records_text(data_source['records'])} loaded from the full prediction file."
+    else:
+        source_line = (
+            f"{records_text(data_source['records'])} loaded for preview; "
+            f"{records_text(full_record_count)} available in the full portfolio."
+        )
+    st.markdown(
+        f"""
+        <div class="scope-note">
+            <strong>{scope_label}</strong> · {source_line}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 with st.expander("Filters", expanded=False):
     product_options = sorted(df["type_product"].dropna().unique())
@@ -850,15 +983,13 @@ filtered["policy_display"] = filtered["type_policy_dg"].map(policy_label)
 filtered["channel_display"] = filtered["distribution_channel"].map(channel_label)
 filtered["gender_display"] = filtered["gender"].map(gender_label)
 portfolio_view = filtered.copy()
+age_order = age_summary["age_group"].astype(str).tolist()
+portfolio_segments = summarize_segments(portfolio_view)
 
 action_options = ["ALL"] + [a for a in ACTION_LABELS if a != "ALL" and a in df["decision_action"].unique()]
 retain_view = portfolio_view[portfolio_view["decision_action"] == "RETAIN_HIGH"]
 early_view = portfolio_view[portfolio_view["decision_action"] == "EARLY_RISK"]
-pricing_segments = seg_summary[
-    seg_summary["type_product"].isin(products)
-    & seg_summary["type_policy_dg"].isin(policies)
-    & (seg_summary["loss_ratio"] > 1)
-]
+pricing_segments = portfolio_segments[portfolio_segments["loss_ratio"] > 1]
 priority_records = retain_view.shape[0] + early_view.shape[0]
 retention_premium = retain_view["premium"].sum()
 early_expected_claim = early_view["expected_claim_cost"].sum()
@@ -876,7 +1007,7 @@ st.markdown(
     f"""
     <p class="page-copy">
     {fmt_int(filtered["ID_policy"].nunique())} policies in view ·
-    {fmt_int(filtered.shape[0])} customers evaluated · actions prioritized by expected financial impact.
+    {records_text(filtered.shape[0])} in scope · actions prioritized by expected financial impact.
     </p>
     """,
     unsafe_allow_html=True,
@@ -888,9 +1019,9 @@ st.markdown(
         <div class="exec-eyebrow">Current exposure</div>
         <div class="exec-title">Protect {fmt_money(retention_premium)} in premium at risk while addressing {fmt_money(early_expected_claim)} in expected claim exposure.</div>
         <div class="exec-copy">
-        Start with {fmt_int(priority_records)} priority customers:
-        {fmt_int(retain_view.shape[0])} profitable customers likely to lapse and {fmt_int(early_view.shape[0])}
-        high-claim-risk customers for early intervention. {pricing_note}
+        Start with {fmt_int(priority_records)} priority member records:
+        {fmt_int(retain_view.shape[0])} profitable records likely to lapse and {fmt_int(early_view.shape[0])}
+        high-claim-risk records for early intervention. {pricing_note}
         </div>
     </div>
     """,
@@ -903,17 +1034,17 @@ st.markdown(
         <div class="exec-card">
             <div class="exec-label">First wave</div>
             <div class="exec-value">Focused outreach</div>
-            <div class="exec-note">Direct retention spend to customers with the clearest business upside.</div>
+            <div class="exec-note">Direct retention spend to member records with the clearest business upside.</div>
         </div>
         <div class="exec-card">
             <div class="exec-label">Premium at risk</div>
             <div class="exec-value">{fmt_money(retention_premium)}</div>
-            <div class="exec-note">{fmt_int(retain_view.shape[0])} profitable customers likely to lapse.</div>
+            <div class="exec-note">{fmt_int(retain_view.shape[0])} profitable records likely to lapse.</div>
         </div>
         <div class="exec-card">
             <div class="exec-label">Claim exposure</div>
             <div class="exec-value">{fmt_money(early_expected_claim)}</div>
-            <div class="exec-note">{fmt_int(early_view.shape[0])} customers flagged for early intervention.</div>
+            <div class="exec-note">{fmt_int(early_view.shape[0])} records flagged for early intervention.</div>
         </div>
         <div class="exec-card">
             <div class="exec-label">Confidence</div>
@@ -956,11 +1087,14 @@ empty_filter_guard(filtered)
 filtered["action_label"] = (
     filtered["decision_action"].map(PLOT_ACTION_LABELS).fillna(filtered["decision_action"])
 )
+active_segments = summarize_segments(filtered)
+active_age_summary = summarize_age(filtered, age_order)
 
 left, right = st.columns([1.35, 1])
 
 with left:
-    panel_header("Lapse risk vs claim exposure", "each point is one customer")
+    scatter_meta = "top 5,000 records by lapse risk" if filtered.shape[0] > 5000 else "each point is one record"
+    panel_header("Lapse risk vs claim exposure", scatter_meta)
     threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
     cost_median = filtered["expected_claim_cost"].median()
 
@@ -1005,7 +1139,7 @@ with left:
     )
     fig.update_xaxes(gridcolor="#e8eae5", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
     fig.update_yaxes(gridcolor="#e8eae5", tickformat=".0%", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 with right:
     panel_title = "Work queue split" if selected_action == "ALL" else "Selected queue"
@@ -1038,7 +1172,7 @@ with right:
         )
         fig_mix.update_xaxes(gridcolor="#e8eae5", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
         fig_mix.update_yaxes(categoryorder="total ascending", tickfont=dict(size=13, color="#46565e"))
-        st.plotly_chart(fig_mix, use_container_width=True)
+        st.plotly_chart(fig_mix, width="stretch")
         for action in action_counts["decision_action"].tolist():
             st.markdown(
                 f"{action_chip(action)} "
@@ -1069,10 +1203,7 @@ with right:
             unsafe_allow_html=True,
         )
 
-seg_filtered = seg_summary[
-    seg_summary["type_product"].isin(products)
-    & seg_summary["type_policy_dg"].isin(policies)
-].copy()
+seg_filtered = active_segments.copy()
 
 rank_col, detail_col = st.columns([1, 1])
 with rank_col:
@@ -1103,7 +1234,7 @@ with detail_col:
             "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
             "Age": st.column_config.NumberColumn("Age", format="%.1f"),
         },
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         height=492,
     )
@@ -1117,7 +1248,7 @@ with tab_overview:
     with c1:
         panel_header("Risk by age group", "selected portfolio")
         fig_age = px.bar(
-            age_summary,
+            active_age_summary,
             x="age_group",
             y="lapse_rate",
             color="lapse_rate",
@@ -1126,7 +1257,7 @@ with tab_overview:
         )
         fig_age.update_layout(height=330, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
         fig_age.update_yaxes(tickformat=".0%")
-        st.plotly_chart(fig_age, use_container_width=True)
+        st.plotly_chart(fig_age, width="stretch")
     with c2:
         panel_header("Premium vs claim distribution", "selected portfolio")
         fig_hist = go.Figure()
@@ -1142,7 +1273,7 @@ with tab_overview:
         )
         fig_hist.update_xaxes(title_standoff=12)
         fig_hist.update_yaxes(title_standoff=10)
-        st.plotly_chart(fig_hist, use_container_width=True)
+        st.plotly_chart(fig_hist, width="stretch")
 
 with tab_model:
     lapse_val = model_summary["lapse_model"]["val"]
@@ -1165,7 +1296,7 @@ with tab_model:
         feat["Driver"] = feat["feature"].map(business_feature_label)
         fig_feat = px.bar(feat, x="importance", y="Driver", orientation="h", color_discrete_sequence=["#2f6f67"])
         fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5), yaxis_title="", xaxis_title="Driver strength")
-        st.plotly_chart(fig_feat, use_container_width=True)
+        st.plotly_chart(fig_feat, width="stretch")
 
 with tab_sim:
     sim_l, sim_r = st.columns(2)
@@ -1216,9 +1347,9 @@ with tab_sim:
     retain_change = after.get("RETAIN_HIGH", 0) - before.get("RETAIN_HIGH", 0)
     s1, s2, s3 = st.columns(3)
     with s1:
-        kpi_card("Standard queue change", fmt_signed_int(standard_change), "customers moving out of priority queues")
+        kpi_card("Standard queue change", fmt_signed_int(standard_change), "records moving out of priority queues")
     with s2:
-        kpi_card("Retain queue change", fmt_signed_int(retain_change), "profitable high-lapse customers")
+        kpi_card("Retain queue change", fmt_signed_int(retain_change), "profitable high-lapse records")
     with s3:
         kpi_card("Profit impact", fmt_signed_money(profit_after - profit_before), f"{premium_change:+d}% premium move")
 
@@ -1253,7 +1384,7 @@ with tab_sim:
         yaxis=dict(range=[0, planning_axis_max], tickmode="linear", dtick=2000),
     )
     fig_impact.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False)
-    st.plotly_chart(fig_impact, use_container_width=True)
+    st.plotly_chart(fig_impact, width="stretch")
 
     f1, f2, f3 = st.columns(3)
     with f1:
@@ -1288,7 +1419,7 @@ with tab_records:
             "Lapse risk": st.column_config.NumberColumn("Lapse risk", format="%.1f%%"),
             "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
         },
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -1315,7 +1446,7 @@ with tab_appendix:
             plot_bgcolor="#ffffff",
             yaxis_title="Records",
         )
-        st.plotly_chart(fig_prem, use_container_width=True)
+        st.plotly_chart(fig_prem, width="stretch")
 
     with diag_r:
         panel_header("Expected claim distribution", "filtered portfolio")
@@ -1334,7 +1465,7 @@ with tab_appendix:
             plot_bgcolor="#ffffff",
             yaxis_title="Records",
         )
-        st.plotly_chart(fig_claim, use_container_width=True)
+        st.plotly_chart(fig_claim, width="stretch")
 
     seg_l, seg_r = st.columns(2)
     with seg_l:
@@ -1359,7 +1490,7 @@ with tab_appendix:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         )
         fig_lapse.update_yaxes(tickformat=".0%")
-        st.plotly_chart(fig_lapse, use_container_width=True)
+        st.plotly_chart(fig_lapse, width="stretch")
 
     with seg_r:
         panel_header("Segment heatmap", "average lapse rate")
@@ -1393,17 +1524,10 @@ with tab_appendix:
             xaxis_title="Policy",
             yaxis_title="Product",
         )
-        st.plotly_chart(fig_heat, use_container_width=True)
+        st.plotly_chart(fig_heat, width="stretch")
 
     age_l, age_r = st.columns(2)
-    age_diag = (
-        filtered.groupby("age_group", observed=False)
-        .agg(lapse_rate=("lapse_probability", "mean"), avg_claim=("expected_claim_cost", "mean"))
-        .reset_index()
-    )
-    age_order = age_summary["age_group"].tolist()
-    age_diag["age_group"] = pd.Categorical(age_diag["age_group"], categories=age_order, ordered=True)
-    age_diag = age_diag.sort_values("age_group")
+    age_diag = active_age_summary.copy()
     with age_l:
         panel_header("Lapse by age group", "filtered portfolio")
         fig_age_lapse = px.bar(
@@ -1416,7 +1540,7 @@ with tab_appendix:
         )
         fig_age_lapse.update_layout(height=320, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
         fig_age_lapse.update_yaxes(tickformat=".0%")
-        st.plotly_chart(fig_age_lapse, use_container_width=True)
+        st.plotly_chart(fig_age_lapse, width="stretch")
     with age_r:
         panel_header("Claim exposure by age group", "filtered portfolio")
         fig_age_claim = px.bar(
@@ -1428,7 +1552,7 @@ with tab_appendix:
             labels={"age_group": "Age group", "avg_claim": "Expected claim"},
         )
         fig_age_claim.update_layout(height=320, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
-        st.plotly_chart(fig_age_claim, use_container_width=True)
+        st.plotly_chart(fig_age_claim, width="stretch")
 
     panel_header("Work queue detail", "filtered action split")
     action_detail = (
@@ -1459,7 +1583,7 @@ with tab_appendix:
             "Lapse": st.column_config.NumberColumn("Lapse", format="%.1f%%"),
             "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
         },
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -1493,10 +1617,10 @@ with tab_appendix:
                 labels={"importance": "Importance", "Driver": ""},
             )
             fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5))
-            st.plotly_chart(fig_feat, use_container_width=True)
+            st.plotly_chart(fig_feat, width="stretch")
             st.dataframe(
                 feat.rename(columns={"importance": "Importance"})[["Driver", "Importance"]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -1529,10 +1653,10 @@ with tab_appendix:
                 labels={"importance": "Importance", "Driver": ""},
             )
             fig_claim_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5))
-            st.plotly_chart(fig_claim_feat, use_container_width=True)
+            st.plotly_chart(fig_claim_feat, width="stretch")
             st.dataframe(
                 claim_feat.rename(columns={"importance": "Importance"})[["Driver", "Importance"]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -1578,7 +1702,7 @@ with tab_appendix:
             "Lapse risk": st.column_config.NumberColumn("Lapse risk", format="%.1f%%"),
             "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
         },
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 

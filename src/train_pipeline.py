@@ -23,6 +23,14 @@ from sklearn.metrics import (
     mean_squared_error, mean_absolute_error, r2_score,
 )
 
+PREDICTION_COLUMNS = [
+    "ID", "ID_policy", "ID_insured", "age", "gender", "type_product",
+    "type_policy_dg", "premium", "cost_claims_year", "n_medical_services",
+    "distribution_channel", "seniority_policy", "loss_ratio",
+    "lapse_probability", "predicted_claim_cost", "decision_action",
+    "age_group", "tenure_group", "lapse",
+]
+
 
 def _summary_metadata(metadata):
     """Return metadata fields that can be written to JSON."""
@@ -157,13 +165,15 @@ def main():
     age.to_csv("output/age_summary.csv", index=False)
     actions.to_csv("output/action_counts.csv", index=False)
 
-    # Save full predictions for dashboard sampling
-    sample = df.sample(n=20000, random_state=42)
-    sample[["ID", "ID_policy", "ID_insured", "age", "gender", "type_product",
-             "type_policy_dg", "premium", "cost_claims_year", "n_medical_services",
-             "distribution_channel", "seniority_policy", "loss_ratio",
-             "lapse_probability", "predicted_claim_cost", "decision_action",
-             "age_group", "tenure_group"]].to_csv("output/predictions_sample.csv", index=False)
+    # Save full predictions for the dashboard, plus a small preview for fast QA.
+    prediction_data = df[PREDICTION_COLUMNS].copy()
+    prediction_data.to_csv(
+        "output/predictions_full.csv.gz",
+        index=False,
+        compression="gzip",
+    )
+    sample = prediction_data.sample(n=min(20000, len(prediction_data)), random_state=42)
+    sample.to_csv("output/predictions_sample.csv", index=False)
 
     # Summary stats
     summary = {
@@ -172,7 +182,13 @@ def main():
         "data_shape": list(df.shape),
         "total_customers": df["ID_insured"].nunique(),
         "total_policies": df["ID_policy"].nunique(),
+        "total_records": int(df.shape[0]),
         "decision_actions": {k: int(v) for k, v in df["decision_action"].value_counts().items()},
+        "dashboard_artifacts": {
+            "full_predictions": "output/predictions_full.csv.gz",
+            "sample_predictions": "output/predictions_sample.csv",
+            "sample_records": int(sample.shape[0]),
+        },
         "split": {"train": 0.70, "validation": 0.15, "test": 0.15},
         "model_metadata": {
             "lapse": _summary_metadata(lapse_meta),

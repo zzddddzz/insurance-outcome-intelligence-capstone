@@ -39,11 +39,17 @@
   ],
   "total_customers": 1467,
   "total_policies": 45162,
+  "total_records": 228711,
   "decision_actions": {
     "STANDARD": 152310,
     "RETAIN_HIGH": 56394,
     "EARLY_RISK": 19855,
     "LOW_PRIORITY": 152
+  },
+  "dashboard_artifacts": {
+    "full_predictions": "output/predictions_full.csv.gz",
+    "sample_predictions": "output/predictions_sample.csv",
+    "sample_records": 20000
   },
   "split": {
     "train": 0.7,

@@ -78,7 +78,8 @@ Health_Insurance_Datasets/
 │   ├── model_summary.json          # All model metrics
 │   ├── decision_summary.csv        # Portfolio by decision action
 │   ├── segment_summary.csv         # Segment-level analytics
-│   ├── predictions_sample.csv      # 20K predictions for dashboard
+│   ├── predictions_full.csv.gz     # Full 228K modeled records for dashboard
+│   ├── predictions_sample.csv      # 20K preview predictions for fast QA
 │   └── *.png                       # Generated visualizations
 └── Dataset_of_health_insurance_portfolio.xlsx   # Source data
 ```
@@ -111,7 +112,7 @@ Customers are classified into 4 action categories:
 ## Troubleshooting
 
 - **`ModuleNotFoundError`**: Run `pip install -r requirements.txt`
-- **Dashboard crashes on heatmap**: Make sure `output/predictions_sample.csv` exists (run `python3 src/train_pipeline.py` first)
+- **Dashboard data missing**: Make sure `output/predictions_full.csv.gz` or `output/predictions_sample.csv` exists (run `python3 src/train_pipeline.py` first)
 - **Port 8502 in use**: Change port with `--server.port 8503`
 
 ## Data Source
