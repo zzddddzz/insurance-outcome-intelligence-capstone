@@ -1060,7 +1060,13 @@ with tab_sim:
         labels={"Action": "Action", "Records": "Records"},
         color_discrete_map={"Before": "#cfd6d8", "After": "#146c94"},
     )
-    fig_impact.update_layout(height=360, margin=dict(l=5, r=5, t=10, b=5))
+    planning_axis_records = max(int(before.max()) if not before.empty else 1, 1)
+    planning_axis_max = max(16000, ((planning_axis_records * 115 + 99999) // 100000) * 1000)
+    fig_impact.update_layout(
+        height=360,
+        margin=dict(l=5, r=5, t=10, b=5),
+        yaxis=dict(range=[0, planning_axis_max], tickmode="linear", dtick=2000),
+    )
     fig_impact.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False)
     st.plotly_chart(fig_impact, use_container_width=True)
 
