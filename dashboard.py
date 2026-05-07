@@ -598,51 +598,78 @@ def segment_cards(segment_frame: pd.DataFrame, limit: int = 5) -> None:
 
 def empty_filter_guard(frame: pd.DataFrame) -> None:
     if frame.empty:
-        st.warning("No records match the current filters. Loosen the filters in the sidebar.")
+        st.warning("No records match the current filters. Loosen the filters above.")
         st.stop()
 
 
 add_css()
 df, seg_summary, decision_summary, age_summary, model_summary = load_data()
 
-with st.sidebar:
-    st.markdown("### Filters")
+st.markdown(
+    """
+    <div class="topbar">
+        <div class="brand">
+            <span class="brand-mark">PA</span>
+            <div>
+                <div class="brand-title">Insurance Outcome Intelligence</div>
+                <div class="brand-subtitle">Portfolio risk and retention outlook</div>
+            </div>
+        </div>
+        <span class="live-pill">Q3 view</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown("### Filters")
+with st.container(border=True):
     product_options = sorted(df["type_product"].dropna().unique())
-    products = st.multiselect(
-        "Product",
-        product_options,
-        default=product_options,
-        format_func=product_label,
-    )
     policy_options = sorted(df["type_policy_dg"].dropna().unique())
-    policies = st.multiselect(
-        "Policy type",
-        policy_options,
-        default=policy_options,
-        format_func=policy_label,
-    )
     channel_options = sorted(df["distribution_channel"].dropna().unique())
-    channels = st.multiselect(
-        "Channel",
-        channel_options,
-        default=channel_options,
-        format_func=channel_label,
-    )
     gender_options = sorted(df["gender"].dropna().unique())
-    genders = st.multiselect(
-        "Gender",
-        gender_options,
-        default=gender_options,
-        format_func=gender_label,
-    )
-    age_range = st.slider(
-        "Age range",
-        int(df["age"].min()),
-        int(df["age"].max()),
-        (int(df["age"].min()), int(df["age"].max())),
-    )
-    lapse_percentile = st.slider("High lapse percentile", 50, 95, 75, 1)
-    top_n = st.slider("Rows in action list", 10, 500, 75, 5)
+
+    f1, f2, f3, f4 = st.columns(4)
+    with f1:
+        products = st.multiselect(
+            "Product",
+            product_options,
+            default=product_options,
+            format_func=product_label,
+        )
+    with f2:
+        policies = st.multiselect(
+            "Policy type",
+            policy_options,
+            default=policy_options,
+            format_func=policy_label,
+        )
+    with f3:
+        channels = st.multiselect(
+            "Channel",
+            channel_options,
+            default=channel_options,
+            format_func=channel_label,
+        )
+    with f4:
+        genders = st.multiselect(
+            "Gender",
+            gender_options,
+            default=gender_options,
+            format_func=gender_label,
+        )
+
+    r1, r2, r3 = st.columns([1.4, 1, 1])
+    with r1:
+        age_range = st.slider(
+            "Age range",
+            int(df["age"].min()),
+            int(df["age"].max()),
+            (int(df["age"].min()), int(df["age"].max())),
+        )
+    with r2:
+        lapse_percentile = st.slider("High lapse percentile", 50, 95, 75, 1)
+    with r3:
+        top_n = st.slider("Rows in action list", 10, 500, 75, 5)
 
 mask = (
     df["type_product"].isin(products)
@@ -678,22 +705,6 @@ elif pricing_count > 1:
     pricing_note = f"{fmt_int(pricing_count)} segments should move to pricing review."
 else:
     pricing_note = "No selected segment currently needs pricing review."
-
-st.markdown(
-    """
-    <div class="topbar">
-        <div class="brand">
-            <span class="brand-mark">PA</span>
-            <div>
-                <div class="brand-title">Insurance Outcome Intelligence</div>
-                <div class="brand-subtitle">Portfolio risk and retention outlook</div>
-            </div>
-        </div>
-        <span class="live-pill">Q3 view</span>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
 
 st.markdown('<div class="page-kicker">Q3 2026 portfolio review</div>', unsafe_allow_html=True)
 st.markdown('<h1 class="page-title">Protect revenue and reduce claim exposure</h1>', unsafe_allow_html=True)
@@ -1055,7 +1066,7 @@ with tab_records:
 
 with tab_appendix:
     st.markdown(
-        "Deeper diagnostics for review. The sidebar filters and action category selection apply here too."
+        "Deeper diagnostics for review. The filters above and action category selection apply here too."
     )
 
     diag_l, diag_r = st.columns(2)
