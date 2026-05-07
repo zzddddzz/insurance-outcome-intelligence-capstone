@@ -1047,7 +1047,7 @@ with tab_sim:
     impact_long["Bar label"] = impact_long.apply(
         lambda row: f"{row['Records']:,.0f}<br>{fmt_signed_int(change_labels[row['Action']])}"
         if row["Scenario"] == "After"
-        else f"{row['Records']:,.0f}<br>base",
+        else f"{row['Records']:,.0f}",
         axis=1,
     )
     fig_impact = px.bar(
