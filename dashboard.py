@@ -642,7 +642,7 @@ with st.sidebar:
         (int(df["age"].min()), int(df["age"].max())),
     )
     lapse_percentile = st.slider("High lapse percentile", 50, 95, 75, 1)
-    top_n = st.slider("Rows in customer table", 10, 500, 75, 5)
+    top_n = st.slider("Rows in action list", 10, 500, 75, 5)
 
 mask = (
     df["type_product"].isin(products)
@@ -701,7 +701,7 @@ st.markdown(
     f"""
     <p class="page-copy">
     {fmt_int(filtered["ID_policy"].nunique())} policies in view ·
-    {fmt_int(filtered.shape[0])} modeled records · recommended actions ranked by business value and operational urgency.
+    {fmt_int(filtered.shape[0])} evaluated customer records · recommended actions ranked by business value and operational urgency.
     </p>
     """,
     unsafe_allow_html=True,
@@ -713,7 +713,7 @@ st.markdown(
         <div class="exec-eyebrow">CEO recommendation</div>
         <div class="exec-title">Approve a targeted retention push for profitable high-lapse customers and route high-claim exposure to early intervention.</div>
         <div class="exec-copy">
-        The current portfolio view identifies {fmt_int(priority_records)} priority records:
+        The current portfolio view identifies {fmt_int(priority_records)} priority customers:
         {fmt_int(retain_view.shape[0])} profitable customers to retain and {fmt_int(early_view.shape[0])}
         high-claim-risk customers to manage before losses materialize. {pricing_note}
         </div>
@@ -733,17 +733,17 @@ st.markdown(
         <div class="exec-card">
             <div class="exec-label">Premium at risk</div>
             <div class="exec-value">{fmt_money(retention_premium)}</div>
-            <div class="exec-note">{fmt_int(retain_view.shape[0])} profitable high-lapse records.</div>
+            <div class="exec-note">{fmt_int(retain_view.shape[0])} profitable high-lapse customers.</div>
         </div>
         <div class="exec-card">
             <div class="exec-label">Claim exposure</div>
             <div class="exec-value">{fmt_money(early_expected_claim)}</div>
-            <div class="exec-note">{fmt_int(early_view.shape[0])} records routed to early intervention.</div>
+            <div class="exec-note">{fmt_int(early_view.shape[0])} customers routed to early intervention.</div>
         </div>
         <div class="exec-card">
             <div class="exec-label">Model confidence</div>
-            <div class="exec-value">{lapse_auc:.3f} AUC</div>
-            <div class="exec-note">{lapse_recall:.1%} recall on held-out lapse test.</div>
+        <div class="exec-value">Strong signal</div>
+        <div class="exec-note">{lapse_auc:.3f} risk-ranking score; {lapse_recall:.1%} high-risk capture.</div>
         </div>
     </div>
     """,
@@ -907,13 +907,13 @@ with detail_col:
     )
 
 tab_overview, tab_model, tab_sim, tab_records = st.tabs(
-    ["Portfolio trends", "Model evidence", "Simulator", "Customer records"]
+    ["Portfolio outlook", "Decision confidence", "Scenario planning", "Action list"]
 )
 
 with tab_overview:
     c1, c2 = st.columns(2)
     with c1:
-        panel_header("Risk by age group", "book-level summary")
+        panel_header("Risk by age group", "portfolio view")
         fig_age = px.bar(
             age_summary,
             x="age_group",
@@ -926,7 +926,7 @@ with tab_overview:
         fig_age.update_yaxes(tickformat=".0%")
         st.plotly_chart(fig_age, use_container_width=True)
     with c2:
-        panel_header("Premium vs claim distribution", "current filtered view")
+        panel_header("Premium vs claim distribution", "selected portfolio")
         fig_hist = go.Figure()
         fig_hist.add_trace(go.Histogram(x=filtered["premium"], name="Premium", opacity=0.72, marker_color="#315f86"))
         fig_hist.add_trace(go.Histogram(x=filtered["expected_claim_cost"], name="Expected claim", opacity=0.62, marker_color="#b9484a"))
@@ -947,20 +947,20 @@ with tab_model:
     claim_test = model_summary["claim_model"].get("test", claim_val)
     m1, m2, m3, m4 = st.columns(4)
     with m1:
-        kpi_card("Lapse ROC AUC", f"{lapse_test['roc_auc']:.3f}", f"validation {lapse_val['roc_auc']:.3f}")
+        kpi_card("Risk ranking strength", "Strong", f"{lapse_test['roc_auc']:.3f} score on unseen cases")
     with m2:
-        kpi_card("Lapse recall", f"{lapse_test['recall']:.3f}", f"precision {lapse_test['precision']:.3f}")
+        kpi_card("High-risk capture", f"{lapse_test['recall']:.1%}", "coverage of known high-risk cases")
     with m3:
-        kpi_card("Claim RMSE", fmt_money(claim_test["rmse"]), f"MAE {fmt_money(claim_test['mae'])}")
+        kpi_card("Claim forecast error", fmt_money(claim_test["rmse"]), f"typical error {fmt_money(claim_test['mae'])}")
     with m4:
-        kpi_card("Claim R²", f"{claim_test['r2']:.3f}", "held-out test")
+        kpi_card("Claim forecast fit", "Moderate", f"{claim_test['r2']:.3f} fit on unseen cases")
 
     feat_path = ROOT / "output" / "feature_importance.csv"
     if feat_path.exists():
         feat = pd.read_csv(feat_path).head(15).sort_values("importance")
         feat["Driver"] = feat["feature"].map(business_feature_label)
         fig_feat = px.bar(feat, x="importance", y="Driver", orientation="h", color_discrete_sequence=["#2f6f67"])
-        fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5), yaxis_title="", xaxis_title="Relative importance")
+        fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5), yaxis_title="", xaxis_title="Decision driver strength")
         st.plotly_chart(fig_feat, use_container_width=True)
 
 with tab_sim:
@@ -1025,7 +1025,7 @@ with tab_sim:
         kpi_card("Avg lapse after lift", fmt_pct(sim["sim_lapse_probability"].mean()), f"{retention_lift}% retention lift")
 
 with tab_records:
-    panel_header("Customer-level risk view", f"top {top_n} by lapse risk")
+    panel_header("Priority action list", f"top {top_n} by lapse risk")
     records = filtered.sort_values("lapse_probability", ascending=False).head(top_n).copy()
     records_display = pd.DataFrame(
         {
@@ -1054,5 +1054,5 @@ with tab_records:
     )
 
 st.caption(
-    "Portfolio Action Console | Team 54 MSDS 498 Capstone | Decision support only."
+    "Insurance Outcome Intelligence | Executive decision-support prototype | Not for production underwriting."
 )
