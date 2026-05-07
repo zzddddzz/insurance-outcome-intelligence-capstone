@@ -686,10 +686,10 @@ st.markdown(
             <span class="brand-mark">PA</span>
             <div>
                 <div class="brand-title">Insurance Outcome Intelligence</div>
-                <div class="brand-subtitle">Executive portfolio decision support</div>
+                <div class="brand-subtitle">Portfolio risk and retention outlook</div>
             </div>
         </div>
-        <span class="live-pill">portfolio view</span>
+        <span class="live-pill">Q3 view</span>
     </div>
     """,
     unsafe_allow_html=True,
@@ -710,7 +710,7 @@ st.markdown(
 st.markdown(
     f"""
     <div class="exec-brief">
-        <div class="exec-eyebrow">Recommended action</div>
+        <div class="exec-eyebrow">Revenue protection focus</div>
         <div class="exec-title">Protect {fmt_money(retention_premium)} in premium at risk while addressing {fmt_money(early_expected_claim)} in expected claim exposure.</div>
         <div class="exec-copy">
         Start with {fmt_int(priority_records)} priority customers:
@@ -726,7 +726,7 @@ st.markdown(
     f"""
     <div class="exec-grid">
         <div class="exec-card">
-            <div class="exec-label">Next move</div>
+            <div class="exec-label">Retention focus</div>
             <div class="exec-value">Launch focused outreach</div>
             <div class="exec-note">Direct retention spend to customers with the clearest business upside.</div>
         </div>
@@ -741,8 +741,8 @@ st.markdown(
             <div class="exec-note">{fmt_int(early_view.shape[0])} customers flagged for early intervention.</div>
         </div>
         <div class="exec-card">
-            <div class="exec-label">Decision confidence</div>
-            <div class="exec-value">Validated signal</div>
+            <div class="exec-label">Confidence</div>
+            <div class="exec-value">Clear signal</div>
             <div class="exec-note">Risk ranking and high-risk capture hold up on unseen cases.</div>
         </div>
     </div>
@@ -784,7 +784,7 @@ filtered["action_label"] = (
 left, right = st.columns([1.35, 1])
 
 with left:
-    panel_header("Decision quadrant", "lapse risk x expected claim cost")
+    panel_header("Risk and value map", "lapse risk x expected claim cost")
     threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
     cost_median = filtered["expected_claim_cost"].median()
 
@@ -832,7 +832,7 @@ with left:
     st.plotly_chart(fig, use_container_width=True)
 
 with right:
-    panel_header("Action mix", f"{fmt_int(filtered.shape[0])} records")
+    panel_header("Portfolio action split", f"{fmt_int(filtered.shape[0])} records")
     action_counts = (
         filtered["decision_action"]
         .value_counts()
@@ -907,13 +907,13 @@ with detail_col:
     )
 
 tab_overview, tab_model, tab_sim, tab_records = st.tabs(
-    ["Portfolio outlook", "Decision confidence", "Scenario planning", "Action list"]
+    ["Portfolio outlook", "Confidence", "Planning", "Action list"]
 )
 
 with tab_overview:
     c1, c2 = st.columns(2)
     with c1:
-        panel_header("Risk by age group", "portfolio view")
+        panel_header("Risk by age group", "selected portfolio")
         fig_age = px.bar(
             age_summary,
             x="age_group",
@@ -960,7 +960,7 @@ with tab_model:
         feat = pd.read_csv(feat_path).head(15).sort_values("importance")
         feat["Driver"] = feat["feature"].map(business_feature_label)
         fig_feat = px.bar(feat, x="importance", y="Driver", orientation="h", color_discrete_sequence=["#2f6f67"])
-        fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5), yaxis_title="", xaxis_title="Decision driver strength")
+        fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5), yaxis_title="", xaxis_title="Driver strength")
         st.plotly_chart(fig_feat, use_container_width=True)
 
 with tab_sim:
@@ -1054,5 +1054,5 @@ with tab_records:
     )
 
 st.caption(
-    "Insurance Outcome Intelligence | Executive decision-support prototype | Not for production underwriting."
+    "Insurance Outcome Intelligence | Portfolio planning view | Illustrative analysis for management review."
 )
