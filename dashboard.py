@@ -773,6 +773,69 @@ def amount_distribution_figure(frame: pd.DataFrame, ceiling: float) -> go.Figure
     return fig
 
 
+def queue_split_figure(action_counts: pd.DataFrame, total_records: int) -> go.Figure:
+    queue = action_counts.copy()
+    queue["share"] = queue["count"] / max(total_records, 1)
+    queue["label"] = queue.apply(
+        lambda row: f"{fmt_int(row['count'])} · {fmt_share_pct(row['share'])}",
+        axis=1,
+    )
+    queue["color"] = queue["decision_action"].map(ACTION_COLORS)
+    queue = queue.sort_values("count", ascending=True)
+    max_count = max(float(queue["count"].max()), 1.0)
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=queue["count"],
+            y=queue["action_label"],
+            orientation="h",
+            marker=dict(color=queue["color"], line=dict(width=0)),
+            customdata=queue[["label"]],
+            hovertemplate="%{y}<br>%{customdata[0]} of selected portfolio<extra></extra>",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=queue["count"],
+            y=queue["action_label"],
+            mode="markers+text",
+            marker=dict(
+                color=queue["color"],
+                size=15,
+                line=dict(color="#ffffff", width=2),
+            ),
+            text=queue["label"],
+            textposition="middle right",
+            textfont=dict(color="#46565e", size=12),
+            customdata=queue[["label"]],
+            hovertemplate="%{y}<br>%{customdata[0]} of selected portfolio<extra></extra>",
+            showlegend=False,
+        )
+    )
+    fig.update_layout(
+        height=280,
+        margin=dict(l=0, r=72, t=5, b=5),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        font=dict(family="Inter Tight, Arial", color="#29363c", size=14),
+    )
+    fig.update_xaxes(
+        range=[0, max_count * 1.18],
+        gridcolor="#e8eae5",
+        title="Records",
+        title_font=dict(size=15),
+        tickfont=dict(size=13, color="#46565e"),
+    )
+    fig.update_yaxes(
+        categoryorder="array",
+        categoryarray=queue["action_label"].tolist(),
+        tickfont=dict(size=13, color="#46565e"),
+    )
+    return fig
+
+
 def product_label(value: str) -> str:
     return PRODUCT_LABELS.get(str(value), str(value))
 
@@ -1237,25 +1300,7 @@ with right:
     )
     action_counts["action_label"] = action_counts["decision_action"].map(PLOT_ACTION_LABELS)
     if selected_action == "ALL":
-        fig_mix = px.bar(
-            action_counts,
-            x="count",
-            y="action_label",
-            orientation="h",
-            color="action_label",
-            color_discrete_map=PLOT_ACTION_COLORS,
-            labels={"count": "Records", "action_label": ""},
-        )
-        fig_mix.update_layout(
-            height=240,
-            showlegend=False,
-            margin=dict(l=0, r=5, t=5, b=5),
-            paper_bgcolor="#ffffff",
-            plot_bgcolor="#ffffff",
-            font=dict(family="Inter Tight, Arial", color="#29363c", size=14),
-        )
-        fig_mix.update_xaxes(gridcolor="#e8eae5", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
-        fig_mix.update_yaxes(categoryorder="total ascending", tickfont=dict(size=13, color="#46565e"))
+        fig_mix = queue_split_figure(action_counts, filtered.shape[0])
         st.plotly_chart(fig_mix, width="stretch")
         for action in action_counts["decision_action"].tolist():
             st.markdown(
