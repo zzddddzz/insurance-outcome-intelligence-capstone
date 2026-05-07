@@ -92,7 +92,7 @@ st.set_page_config(
     page_title="Portfolio Action Console",
     page_icon="PA",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 
