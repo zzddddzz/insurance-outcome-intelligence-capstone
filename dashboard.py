@@ -1130,11 +1130,13 @@ with tab_overview:
         fig_hist.update_layout(
             barmode="overlay",
             height=330,
-            margin=dict(l=5, r=5, t=5, b=5),
-            legend=dict(orientation="h"),
+            margin=dict(l=8, r=8, t=34, b=46),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
             xaxis_title="Annual amount",
             yaxis_title="Records",
         )
+        fig_hist.update_xaxes(title_standoff=12)
+        fig_hist.update_yaxes(title_standoff=10)
         st.plotly_chart(fig_hist, use_container_width=True)
 
 with tab_model:
