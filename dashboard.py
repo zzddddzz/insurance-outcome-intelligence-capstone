@@ -502,6 +502,15 @@ def fmt_money(value: float) -> str:
     return f"${value:,.0f}"
 
 
+def fmt_signed_int(value: float) -> str:
+    return f"{value:+,.0f}"
+
+
+def fmt_signed_money(value: float) -> str:
+    sign = "+" if value >= 0 else "-"
+    return f"{sign}${abs(value):,.0f}"
+
+
 def fmt_pct(value: float) -> str:
     return f"{value * 100:.1f}%"
 
@@ -985,7 +994,7 @@ with tab_sim:
     sim["sim_lapse_probability"] = sim["lapse_probability"] * (1 - retention_lift / 100)
     sim["sim_underpriced"] = sim["sim_premium"] < (sim["expected_claim_cost"] * 0.8)
     sim["sim_profitable"] = sim["sim_premium"] > sim["expected_claim_cost"]
-    sim_threshold = sim["sim_lapse_probability"].quantile(lapse_percentile / 100)
+    sim_threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
 
     def sim_action(row: pd.Series) -> str:
         high_lapse = row["sim_lapse_probability"] >= sim_threshold
@@ -1002,15 +1011,38 @@ with tab_sim:
     sim["sim_action"] = sim.apply(sim_action, axis=1)
     before = sim["decision_action"].value_counts()
     after = sim["sim_action"].value_counts()
+    action_order = sorted(set(before.index) | set(after.index))
     impact = pd.DataFrame(
         {
-            "Action": sorted(set(before.index) | set(after.index)),
-            "Before": [before.get(a, 0) for a in sorted(set(before.index) | set(after.index))],
-            "After": [after.get(a, 0) for a in sorted(set(before.index) | set(after.index))],
+            "Action": action_order,
+            "Before": [before.get(a, 0) for a in action_order],
+            "After": [after.get(a, 0) for a in action_order],
+            "Change": [after.get(a, 0) - before.get(a, 0) for a in action_order],
         }
     )
     impact["Action"] = impact["Action"].map(PLOT_ACTION_LABELS).fillna(impact["Action"])
-    impact_long = impact.melt(id_vars="Action", var_name="Scenario", value_name="Records")
+
+    rev_before = sim["premium"].sum()
+    rev_after = sim["sim_premium"].sum()
+    profit_before = rev_before - sim["expected_claim_cost"].sum()
+    profit_after = rev_after - sim["expected_claim_cost"].sum()
+
+    standard_change = after.get("STANDARD", 0) - before.get("STANDARD", 0)
+    retain_change = after.get("RETAIN_HIGH", 0) - before.get("RETAIN_HIGH", 0)
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        kpi_card("Standard queue change", fmt_signed_int(standard_change), "customers moving out of priority queues")
+    with s2:
+        kpi_card("Retain queue change", fmt_signed_int(retain_change), "profitable high-lapse customers")
+    with s3:
+        kpi_card("Profit impact", fmt_signed_money(profit_after - profit_before), f"{premium_change:+d}% premium move")
+
+    impact_long = impact.melt(
+        id_vars="Action",
+        value_vars=["Before", "After"],
+        var_name="Scenario",
+        value_name="Records",
+    )
     fig_impact = px.bar(
         impact_long,
         x="Action",
@@ -1020,17 +1052,14 @@ with tab_sim:
         labels={"Action": "Action", "Records": "Records"},
     )
     fig_impact.update_layout(height=360, margin=dict(l=5, r=5, t=10, b=5))
+    fig_impact.update_traces(texttemplate="%{y:,.0f}", textposition="outside", cliponaxis=False)
     st.plotly_chart(fig_impact, use_container_width=True)
 
-    rev_before = sim["premium"].sum()
-    rev_after = sim["sim_premium"].sum()
-    profit_before = rev_before - sim["expected_claim_cost"].sum()
-    profit_after = rev_after - sim["expected_claim_cost"].sum()
     f1, f2, f3 = st.columns(3)
     with f1:
-        kpi_card("Revenue impact", fmt_money(rev_after - rev_before), f"{premium_change:+d}% premium move")
+        kpi_card("Revenue impact", fmt_signed_money(rev_after - rev_before), f"{premium_change:+d}% premium move")
     with f2:
-        kpi_card("Profit impact", fmt_money(profit_after - profit_before), f"{fmt_money(profit_after)} simulated")
+        kpi_card("Profit impact", fmt_signed_money(profit_after - profit_before), f"{fmt_money(profit_after)} simulated")
     with f3:
         kpi_card("Avg lapse after lift", fmt_pct(sim["sim_lapse_probability"].mean()), f"{retention_lift}% retention lift")
 
@@ -1319,7 +1348,7 @@ with tab_appendix:
         kpi_card("Simulated profit", fmt_money(profit_after), "after changes")
     with s5:
         profit_pct = (profit_after / profit_before - 1) * 100 if profit_before else 0
-        kpi_card("Profit change", fmt_money(profit_after - profit_before), f"{profit_pct:+.1f}%")
+        kpi_card("Profit change", fmt_signed_money(profit_after - profit_before), f"{profit_pct:+.1f}%")
 
     panel_header("Filtered risk sample", f"top {top_n} by lapse risk")
     appendix_records = filtered.sort_values("lapse_probability", ascending=False).head(top_n).copy()
