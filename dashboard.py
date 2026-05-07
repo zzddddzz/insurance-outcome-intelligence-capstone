@@ -1043,16 +1043,25 @@ with tab_sim:
         var_name="Scenario",
         value_name="Records",
     )
+    change_labels = impact.set_index("Action")["Change"].to_dict()
+    impact_long["Bar label"] = impact_long.apply(
+        lambda row: f"{row['Records']:,.0f}<br>{fmt_signed_int(change_labels[row['Action']])}"
+        if row["Scenario"] == "After"
+        else "",
+        axis=1,
+    )
     fig_impact = px.bar(
         impact_long,
         x="Action",
         y="Records",
         color="Scenario",
+        text="Bar label",
         barmode="group",
         labels={"Action": "Action", "Records": "Records"},
+        color_discrete_map={"Before": "#cfd6d8", "After": "#146c94"},
     )
     fig_impact.update_layout(height=360, margin=dict(l=5, r=5, t=10, b=5))
-    fig_impact.update_traces(texttemplate="%{y:,.0f}", textposition="outside", cliponaxis=False)
+    fig_impact.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False)
     st.plotly_chart(fig_impact, use_container_width=True)
 
     f1, f2, f3 = st.columns(3)
