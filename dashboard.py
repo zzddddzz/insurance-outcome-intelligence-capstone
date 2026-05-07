@@ -424,7 +424,7 @@ def add_css() -> None:
         }
 
         div[data-testid="stRadio"] > label { display: none; }
-        div[role="radiogroup"] {
+        div[data-testid="stRadio"] div[role="radiogroup"] {
             background: var(--bg-card);
             border: 1px solid var(--line-1);
             border-radius: 5px;
@@ -432,7 +432,7 @@ def add_css() -> None:
             padding: 5px;
         }
 
-        div[role="radiogroup"] label {
+        div[data-testid="stRadio"] div[role="radiogroup"] label {
             border: 1px solid transparent;
             border-radius: 4px;
             color: var(--ink-2) !important;
@@ -441,29 +441,48 @@ def add_css() -> None:
             padding: 4px 12px;
         }
 
-        div[role="radiogroup"] label p,
-        div[role="radiogroup"] label span,
-        div[role="radiogroup"] label div {
+        div[data-testid="stRadio"] div[role="radiogroup"] label p,
+        div[data-testid="stRadio"] div[role="radiogroup"] label span,
+        div[data-testid="stRadio"] div[role="radiogroup"] label div {
             color: var(--ink-2) !important;
             font-size: 15px !important;
             font-weight: 700 !important;
         }
 
-        div[role="radiogroup"] label:has(input:checked) {
+        div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
             background: var(--ink-1) !important;
             border-color: var(--ink-1) !important;
             box-shadow: 0 0 0 1px var(--ink-1);
             color: #ffffff !important;
         }
 
-        div[role="radiogroup"] label:has(input:checked) p,
-        div[role="radiogroup"] label:has(input:checked) span,
-        div[role="radiogroup"] label:has(input:checked) div {
+        div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p,
+        div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) span,
+        div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) div {
             color: #ffffff !important;
         }
 
-        div[role="radiogroup"] input {
+        div[data-testid="stRadio"] div[role="radiogroup"] input {
             accent-color: var(--ink-1);
+        }
+
+        div[data-testid="stSegmentedControl"] > label {
+            color: var(--ink-3) !important;
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        div[data-testid="stSegmentedControl"] div[role="radiogroup"] {
+            background: var(--bg-card);
+            border: 1px solid var(--line-1);
+            border-radius: 6px;
+            box-shadow: none;
+            gap: 4px;
+            padding: 4px;
+            width: fit-content;
         }
 
         div[data-testid="stMultiSelect"] span,
@@ -855,12 +874,13 @@ with k3:
 with k4:
     kpi_card("Loss ratio", f"{filtered['loss_ratio'].mean():.2f}", f"{filtered['loss_ratio'].mean() - book_loss:+.2f} vs book")
 
-selected_action = st.radio(
-    "Action category",
+selected_action = st.segmented_control(
+    "View by action",
     action_options,
+    default="ALL",
     format_func=lambda value: ACTION_LABELS.get(value, value),
-    horizontal=True,
-    label_visibility="collapsed",
+    required=True,
+    width="content",
 )
 
 if selected_action != "ALL":
