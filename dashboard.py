@@ -386,6 +386,62 @@ def add_css() -> None:
         .chip-low_priority { background: #eee8f7; color: #67518c; }
         .chip-standard { background: #e7edf3; color: #315f86; }
 
+        .queue-summary {
+            --queue-color: var(--teal);
+            background: var(--bg-card);
+            border: 1px solid var(--line-1);
+            border-left: 4px solid var(--queue-color);
+            border-radius: 5px;
+            min-height: 240px;
+            padding: 16px;
+        }
+
+        .queue-topline {
+            align-items: center;
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+        }
+
+        .queue-count {
+            color: var(--ink-1);
+            font-size: 34px;
+            font-weight: 750;
+            letter-spacing: 0;
+            line-height: 1;
+            margin-top: 18px;
+        }
+
+        .queue-caption {
+            color: var(--ink-3);
+            font-size: 13px;
+            font-weight: 650;
+            margin-top: 6px;
+        }
+
+        .queue-track {
+            background: var(--line-2);
+            border-radius: 999px;
+            height: 10px;
+            margin-top: 18px;
+            overflow: hidden;
+        }
+
+        .queue-fill {
+            background: var(--queue-color);
+            border-radius: inherit;
+            height: 100%;
+        }
+
+        .queue-note {
+            border-top: 1px solid var(--line-2);
+            color: var(--ink-2);
+            font-size: 13px;
+            line-height: 1.45;
+            margin-top: 18px;
+            padding-top: 14px;
+        }
+
         .segment-card {
             background: var(--bg-card);
             border: 1px solid var(--line-1);
@@ -941,7 +997,9 @@ with left:
     st.plotly_chart(fig, use_container_width=True)
 
 with right:
-    panel_header("Work queue split", f"{fmt_int(filtered.shape[0])} records")
+    panel_title = "Work queue split" if selected_action == "ALL" else "Selected queue"
+    panel_meta = f"{fmt_int(filtered.shape[0])} records"
+    panel_header(panel_title, panel_meta)
     action_counts = (
         filtered["decision_action"]
         .value_counts()
@@ -949,30 +1007,53 @@ with right:
         .reset_index(name="count")
     )
     action_counts["action_label"] = action_counts["decision_action"].map(PLOT_ACTION_LABELS)
-    fig_mix = px.bar(
-        action_counts,
-        x="count",
-        y="action_label",
-        orientation="h",
-        color="action_label",
-        color_discrete_map=PLOT_ACTION_COLORS,
-        labels={"count": "Records", "action_label": ""},
-    )
-    fig_mix.update_layout(
-        height=240,
-        showlegend=False,
-        margin=dict(l=0, r=5, t=5, b=5),
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
-        font=dict(family="Inter Tight, Arial", color="#29363c", size=14),
-    )
-    fig_mix.update_xaxes(gridcolor="#e8eae5", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
-    fig_mix.update_yaxes(categoryorder="total ascending", tickfont=dict(size=13, color="#46565e"))
-    st.plotly_chart(fig_mix, use_container_width=True)
-    for action in action_counts["decision_action"].tolist():
+    if selected_action == "ALL":
+        fig_mix = px.bar(
+            action_counts,
+            x="count",
+            y="action_label",
+            orientation="h",
+            color="action_label",
+            color_discrete_map=PLOT_ACTION_COLORS,
+            labels={"count": "Records", "action_label": ""},
+        )
+        fig_mix.update_layout(
+            height=240,
+            showlegend=False,
+            margin=dict(l=0, r=5, t=5, b=5),
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            font=dict(family="Inter Tight, Arial", color="#29363c", size=14),
+        )
+        fig_mix.update_xaxes(gridcolor="#e8eae5", title_font=dict(size=15), tickfont=dict(size=13, color="#46565e"))
+        fig_mix.update_yaxes(categoryorder="total ascending", tickfont=dict(size=13, color="#46565e"))
+        st.plotly_chart(fig_mix, use_container_width=True)
+        for action in action_counts["decision_action"].tolist():
+            st.markdown(
+                f"{action_chip(action)} "
+                f"<span style='color:#5d6970;font-size:13px'>{ACTION_NOTES.get(action, '')}</span>",
+                unsafe_allow_html=True,
+            )
+    else:
+        queue_count = filtered.shape[0]
+        queue_total = max(portfolio_view.shape[0], 1)
+        queue_share = min(queue_count / queue_total, 1)
+        queue_color = ACTION_COLORS.get(selected_action, "#2f6f67")
         st.markdown(
-            f"{action_chip(action)} "
-            f"<span style='color:#5d6970;font-size:13px'>{ACTION_NOTES.get(action, '')}</span>",
+            f"""
+            <div class="queue-summary" style="--queue-color:{queue_color};">
+                <div class="queue-topline">
+                    {action_chip(selected_action)}
+                    <div class="panel-meta">{fmt_pct(queue_share)} of current portfolio</div>
+                </div>
+                <div class="queue-count">{fmt_int(queue_count)}</div>
+                <div class="queue-caption">records in this action queue</div>
+                <div class="queue-track">
+                    <div class="queue-fill" style="width:{queue_share * 100:.1f}%"></div>
+                </div>
+                <div class="queue-note">{ACTION_NOTES.get(selected_action, '')}</div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
 
