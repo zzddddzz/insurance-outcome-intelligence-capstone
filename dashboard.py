@@ -227,6 +227,77 @@ def add_css() -> None:
             margin: 8px 0 16px;
         }
 
+        .exec-brief {
+            background: var(--ink-1);
+            border: 1px solid var(--ink-1);
+            border-radius: 6px;
+            color: #ffffff;
+            margin: 14px 0 14px;
+            padding: 18px 18px 16px;
+        }
+
+        .exec-eyebrow {
+            color: #aec6bd;
+            font-size: 11.5px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .exec-title {
+            color: #ffffff;
+            font-size: clamp(20px, 3vw, 30px);
+            font-weight: 760;
+            line-height: 1.12;
+            margin-bottom: 9px;
+        }
+
+        .exec-copy {
+            color: #d8e1dd;
+            font-size: 15px;
+            line-height: 1.45;
+            max-width: 980px;
+        }
+
+        .exec-grid {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            margin: 0 0 14px;
+        }
+
+        .exec-card {
+            background: var(--bg-card);
+            border: 1px solid var(--line-1);
+            border-radius: 5px;
+            min-height: 104px;
+            padding: 12px 13px;
+        }
+
+        .exec-label {
+            color: var(--ink-3);
+            font-size: 11.5px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .exec-value {
+            color: var(--ink-1);
+            font-size: 22px;
+            font-weight: 760;
+            line-height: 1.12;
+            margin-top: 7px;
+        }
+
+        .exec-note {
+            color: var(--ink-2);
+            font-size: 12.5px;
+            line-height: 1.35;
+            margin-top: 7px;
+        }
+
         .kpi-card {
             background: var(--bg-card);
             border: 1px solid var(--line-1);
@@ -398,9 +469,14 @@ def add_css() -> None:
 
         @media (max-width: 800px) {
             .topbar { align-items: flex-start; gap: 10px; }
+            .exec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .segment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .panel-head { align-items: flex-start; flex-direction: column; }
             .panel-meta { text-align: left; }
+        }
+
+        @media (max-width: 520px) {
+            .exec-grid { grid-template-columns: 1fr; }
         }
         </style>
         """,
@@ -582,8 +658,26 @@ filtered["product_display"] = filtered["type_product"].map(product_label)
 filtered["policy_display"] = filtered["type_policy_dg"].map(policy_label)
 filtered["channel_display"] = filtered["distribution_channel"].map(channel_label)
 filtered["gender_display"] = filtered["gender"].map(gender_label)
+portfolio_view = filtered.copy()
 
 action_options = ["ALL"] + [a for a in ACTION_LABELS if a != "ALL" and a in df["decision_action"].unique()]
+retain_view = portfolio_view[portfolio_view["decision_action"] == "RETAIN_HIGH"]
+early_view = portfolio_view[portfolio_view["decision_action"] == "EARLY_RISK"]
+pricing_segments = seg_summary[
+    seg_summary["type_product"].isin(products)
+    & seg_summary["type_policy_dg"].isin(policies)
+    & (seg_summary["loss_ratio"] > 1)
+]
+priority_records = retain_view.shape[0] + early_view.shape[0]
+retention_premium = retain_view["premium"].sum()
+early_expected_claim = early_view["expected_claim_cost"].sum()
+lapse_auc = model_summary["lapse_model"]["test"]["roc_auc"]
+lapse_recall = model_summary["lapse_model"]["test"]["recall"]
+pricing_note = (
+    f"{fmt_int(pricing_segments.shape[0])} segment also needs pricing review."
+    if not pricing_segments.empty
+    else "No selected segment currently exceeds the pricing review threshold."
+)
 
 st.markdown(
     """
@@ -591,24 +685,67 @@ st.markdown(
         <div class="brand">
             <span class="brand-mark">PA</span>
             <div>
-                <div class="brand-title">Portfolio Action Console</div>
-                <div class="brand-subtitle">MSDS 498 · Team 54 capstone</div>
+                <div class="brand-title">Insurance Outcome Intelligence</div>
+                <div class="brand-subtitle">Executive portfolio decision support</div>
             </div>
         </div>
-        <span class="live-pill">live</span>
+        <span class="live-pill">decision-ready</span>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="page-kicker">Q3 2026 review</div>', unsafe_allow_html=True)
-st.markdown('<h1 class="page-title">Action plan</h1>', unsafe_allow_html=True)
+st.markdown('<div class="page-kicker">Executive brief · Q3 2026</div>', unsafe_allow_html=True)
+st.markdown('<h1 class="page-title">Retention and claim-risk action plan</h1>', unsafe_allow_html=True)
 st.markdown(
     f"""
     <p class="page-copy">
     {fmt_int(filtered["ID_policy"].nunique())} policies in view ·
-    {fmt_int(filtered.shape[0])} modeled records · prioritized by retention risk, pricing adequacy, and expected claims.
+    {fmt_int(filtered.shape[0])} modeled records · recommended actions ranked by business value and operational urgency.
     </p>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    f"""
+    <div class="exec-brief">
+        <div class="exec-eyebrow">CEO recommendation</div>
+        <div class="exec-title">Approve a targeted retention push for profitable high-lapse customers and route high-claim exposure to early intervention.</div>
+        <div class="exec-copy">
+        The current portfolio view identifies {fmt_int(priority_records)} priority records:
+        {fmt_int(retain_view.shape[0])} profitable customers to retain and {fmt_int(early_view.shape[0])}
+        high-claim-risk customers to manage before losses materialize. {pricing_note}
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    f"""
+    <div class="exec-grid">
+        <div class="exec-card">
+            <div class="exec-label">Decision ask</div>
+            <div class="exec-value">Fund targeted outreach</div>
+            <div class="exec-note">Focus retention spend on customers with high lapse risk and positive margin.</div>
+        </div>
+        <div class="exec-card">
+            <div class="exec-label">Premium at risk</div>
+            <div class="exec-value">{fmt_money(retention_premium)}</div>
+            <div class="exec-note">{fmt_int(retain_view.shape[0])} profitable high-lapse records.</div>
+        </div>
+        <div class="exec-card">
+            <div class="exec-label">Claim exposure</div>
+            <div class="exec-value">{fmt_money(early_expected_claim)}</div>
+            <div class="exec-note">{fmt_int(early_view.shape[0])} records routed to early intervention.</div>
+        </div>
+        <div class="exec-card">
+            <div class="exec-label">Model confidence</div>
+            <div class="exec-value">{lapse_auc:.3f} AUC</div>
+            <div class="exec-note">{lapse_recall:.1%} recall on held-out lapse test.</div>
+        </div>
+    </div>
     """,
     unsafe_allow_html=True,
 )
