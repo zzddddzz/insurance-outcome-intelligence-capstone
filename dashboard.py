@@ -30,6 +30,44 @@ ACTION_LABELS = {
     "STANDARD": "Standard",
 }
 
+PRODUCT_LABELS = {
+    "S": "Savings",
+    "P": "Personal",
+    "D": "Death",
+    "I": "Individual",
+}
+
+CHANNEL_LABELS = {
+    "A": "Agent",
+    "I": "Intermediary",
+    "D": "Direct",
+}
+
+GENDER_LABELS = {
+    "F": "Female",
+    "M": "Male",
+}
+
+FEATURE_LABELS = {
+    "n_medical_services": "Medical service usage",
+    "new_business_flag": "New business flag",
+    "type_product": "Product type",
+    "seniority_insured": "Customer tenure",
+    "new_business": "New business",
+    "tenure_group": "Tenure band",
+    "distribution_channel": "Distribution channel",
+    "age_group": "Age band",
+    "seniority_policy": "Policy tenure",
+    "IICIPROV": "Province indicator",
+    "age": "Age",
+    "type_policy": "Policy type",
+    "type_policy_dg": "Policy group",
+    "premium": "Premium",
+    "loss_ratio": "Loss ratio",
+    "n_insured_mun": "Insured count by municipality",
+    "n_insured_prov": "Insured count by province",
+}
+
 PLOT_ACTION_LABELS = {
     "RETAIN_HIGH": "Retain",
     "REVIEW_PRICING": "Reprice",
@@ -260,9 +298,9 @@ def add_css() -> None:
             display: inline-block;
             font-size: 11.5px;
             font-weight: 800;
-            letter-spacing: 0.04em;
+            letter-spacing: 0;
             padding: 2px 7px;
-            text-transform: uppercase;
+            text-transform: none;
             white-space: nowrap;
         }
 
@@ -392,11 +430,31 @@ def fmt_pct(value: float) -> str:
     return f"{value * 100:.1f}%"
 
 
+def product_label(value: str) -> str:
+    return PRODUCT_LABELS.get(str(value), str(value))
+
+
+def policy_label(value: str) -> str:
+    return f"Group {value}"
+
+
+def channel_label(value: str) -> str:
+    return CHANNEL_LABELS.get(str(value), str(value))
+
+
+def gender_label(value: str) -> str:
+    return GENDER_LABELS.get(str(value), str(value))
+
+
+def business_feature_label(value: str) -> str:
+    return FEATURE_LABELS.get(str(value), str(value).replace("_", " ").title())
+
+
 def action_chip(action: str) -> str:
     css = action.lower()
     return (
         f'<span class="action-chip chip-{css}">'
-        f"{ACTION_LABELS.get(action, action).upper()}</span>"
+        f"{ACTION_LABELS.get(action, action)}</span>"
     )
 
 
@@ -436,7 +494,7 @@ def segment_cards(segment_frame: pd.DataFrame, limit: int = 5) -> None:
         return
 
     for idx, row in enumerate(ranked.itertuples(index=False), start=1):
-        label = f"{row.type_product} product · {row.type_policy_dg} policy"
+        label = f"{product_label(row.type_product)} · {policy_label(row.type_policy_dg)}"
         action = "REVIEW_PRICING" if row.loss_ratio > 1 else "RETAIN_HIGH"
         if row.lapse_rate < 0.08 and row.loss_ratio < 0.8:
             action = "STANDARD"
@@ -473,25 +531,33 @@ df, seg_summary, decision_summary, age_summary, model_summary = load_data()
 
 with st.sidebar:
     st.markdown("### Filters")
+    product_options = sorted(df["type_product"].dropna().unique())
     products = st.multiselect(
         "Product",
-        sorted(df["type_product"].dropna().unique()),
-        default=sorted(df["type_product"].dropna().unique()),
+        product_options,
+        default=product_options,
+        format_func=product_label,
     )
+    policy_options = sorted(df["type_policy_dg"].dropna().unique())
     policies = st.multiselect(
         "Policy type",
-        sorted(df["type_policy_dg"].dropna().unique()),
-        default=sorted(df["type_policy_dg"].dropna().unique()),
+        policy_options,
+        default=policy_options,
+        format_func=policy_label,
     )
+    channel_options = sorted(df["distribution_channel"].dropna().unique())
     channels = st.multiselect(
         "Channel",
-        sorted(df["distribution_channel"].dropna().unique()),
-        default=sorted(df["distribution_channel"].dropna().unique()),
+        channel_options,
+        default=channel_options,
+        format_func=channel_label,
     )
+    gender_options = sorted(df["gender"].dropna().unique())
     genders = st.multiselect(
         "Gender",
-        sorted(df["gender"].dropna().unique()),
-        default=sorted(df["gender"].dropna().unique()),
+        gender_options,
+        default=gender_options,
+        format_func=gender_label,
     )
     age_range = st.slider(
         "Age range",
@@ -511,6 +577,11 @@ mask = (
 )
 filtered = df.loc[mask].copy()
 empty_filter_guard(filtered)
+filtered["expected_claim_cost"] = filtered["predicted_claim_cost"].clip(lower=0)
+filtered["product_display"] = filtered["type_product"].map(product_label)
+filtered["policy_display"] = filtered["type_policy_dg"].map(policy_label)
+filtered["channel_display"] = filtered["distribution_channel"].map(channel_label)
+filtered["gender_display"] = filtered["gender"].map(gender_label)
 
 action_options = ["ALL"] + [a for a in ACTION_LABELS if a != "ALL" and a in df["decision_action"].unique()]
 
@@ -536,7 +607,7 @@ st.markdown(
     f"""
     <p class="page-copy">
     {fmt_int(filtered["ID_policy"].nunique())} policies in view ·
-    {fmt_int(filtered.shape[0])} modeled records · sorted by lapse risk and claim pressure.
+    {fmt_int(filtered.shape[0])} modeled records · prioritized by retention risk, pricing adequacy, and expected claims.
     </p>
     """,
     unsafe_allow_html=True,
@@ -550,7 +621,11 @@ with k1:
 with k2:
     kpi_card("Avg lapse risk", fmt_pct(filtered["lapse_probability"].mean()), f"{(filtered['lapse_probability'].mean() - book_lapse) * 100:+.1f} pp vs book")
 with k3:
-    kpi_card("Avg claim pressure", fmt_money(filtered["predicted_claim_cost"].mean()), f"{fmt_money(df['predicted_claim_cost'].mean())} book avg")
+    kpi_card(
+        "Expected claim",
+        fmt_money(filtered["expected_claim_cost"].mean()),
+        f"{fmt_money(df['predicted_claim_cost'].clip(lower=0).mean())} book avg",
+    )
 with k4:
     kpi_card("Loss ratio", f"{filtered['loss_ratio'].mean():.2f}", f"{filtered['loss_ratio'].mean() - book_loss:+.2f} vs book")
 
@@ -572,14 +647,14 @@ filtered["action_label"] = (
 left, right = st.columns([1.35, 1])
 
 with left:
-    panel_header("Decision quadrant", "lapse risk x predicted claim cost")
+    panel_header("Decision quadrant", "lapse risk x expected claim cost")
     threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
-    cost_median = filtered["predicted_claim_cost"].median()
+    cost_median = filtered["expected_claim_cost"].median()
 
     plot_sample = filtered.sort_values("lapse_probability", ascending=False).head(5000)
     fig = px.scatter(
         plot_sample,
-        x="predicted_claim_cost",
+        x="expected_claim_cost",
         y="lapse_probability",
         color="action_label",
         size="premium",
@@ -588,19 +663,21 @@ with left:
         hover_data={
             "ID": True,
             "age": True,
-            "type_product": True,
-            "type_policy_dg": True,
+            "product_display": True,
+            "policy_display": True,
             "premium": ":$,.0f",
-            "predicted_claim_cost": ":$,.0f",
-            "lapse_probability": ":.3f",
+            "expected_claim_cost": ":$,.0f",
+            "lapse_probability": ":.1%",
             "loss_ratio": ":.2f",
             "action_label": False,
-            "decision_action": True,
+            "decision_action": False,
         },
         labels={
-            "predicted_claim_cost": "Predicted claim cost",
-            "lapse_probability": "Lapse probability",
+            "expected_claim_cost": "Expected claim cost",
+            "lapse_probability": "Lapse risk",
             "action_label": "Action",
+            "product_display": "Product",
+            "policy_display": "Policy group",
         },
     )
     fig.add_vline(x=cost_median, line_dash="dash", line_color="#8a949b")
@@ -664,23 +741,29 @@ with rank_col:
     segment_cards(seg_filtered)
 
 with detail_col:
-    panel_header("Segment table", "sortable, filter-aware")
-    segment_table = seg_filtered.rename(
-        columns={
-            "type_product": "Product",
-            "type_policy_dg": "Policy",
-            "count": "Members",
-            "avg_premium": "Avg Premium",
-            "avg_claim": "Avg Claim",
-            "lapse_rate": "Lapse Rate",
-            "loss_ratio": "Loss Ratio",
-            "avg_age": "Avg Age",
+    panel_header("Segment table", "formatted executive view")
+    segment_table = pd.DataFrame(
+        {
+            "Product": seg_filtered["type_product"].map(product_label),
+            "Policy": seg_filtered["type_policy_dg"].map(policy_label),
+            "Members": seg_filtered["count"],
+            "Premium": seg_filtered["avg_premium"],
+            "Claim": seg_filtered["avg_claim"],
+            "Lapse": seg_filtered["lapse_rate"] * 100,
+            "Loss": seg_filtered["loss_ratio"],
+            "Age": seg_filtered["avg_age"],
         }
-    )
+    ).sort_values(["Lapse", "Loss", "Members"], ascending=[False, False, False])
     st.dataframe(
-        segment_table[
-            ["Product", "Policy", "Members", "Avg Premium", "Avg Claim", "Lapse Rate", "Loss Ratio", "Avg Age"]
-        ],
+        segment_table,
+        column_config={
+            "Members": st.column_config.NumberColumn("Members", format="%d"),
+            "Premium": st.column_config.NumberColumn("Premium", format="$%d"),
+            "Claim": st.column_config.NumberColumn("Claim", format="$%d"),
+            "Lapse": st.column_config.NumberColumn("Lapse", format="%.1f%%"),
+            "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
+            "Age": st.column_config.NumberColumn("Age", format="%.1f"),
+        },
         use_container_width=True,
         hide_index=True,
         height=492,
@@ -709,12 +792,14 @@ with tab_overview:
         panel_header("Premium vs claim distribution", "current filtered view")
         fig_hist = go.Figure()
         fig_hist.add_trace(go.Histogram(x=filtered["premium"], name="Premium", opacity=0.72, marker_color="#315f86"))
-        fig_hist.add_trace(go.Histogram(x=filtered["predicted_claim_cost"], name="Predicted claim", opacity=0.62, marker_color="#b9484a"))
+        fig_hist.add_trace(go.Histogram(x=filtered["expected_claim_cost"], name="Expected claim", opacity=0.62, marker_color="#b9484a"))
         fig_hist.update_layout(
             barmode="overlay",
             height=330,
             margin=dict(l=5, r=5, t=5, b=5),
             legend=dict(orientation="h"),
+            xaxis_title="Annual amount",
+            yaxis_title="Records",
         )
         st.plotly_chart(fig_hist, use_container_width=True)
 
@@ -736,8 +821,9 @@ with tab_model:
     feat_path = ROOT / "output" / "feature_importance.csv"
     if feat_path.exists():
         feat = pd.read_csv(feat_path).head(15).sort_values("importance")
-        fig_feat = px.bar(feat, x="importance", y="feature", orientation="h", color_discrete_sequence=["#2f6f67"])
-        fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5), yaxis_title="", xaxis_title="Importance")
+        feat["Driver"] = feat["feature"].map(business_feature_label)
+        fig_feat = px.bar(feat, x="importance", y="Driver", orientation="h", color_discrete_sequence=["#2f6f67"])
+        fig_feat.update_layout(height=420, margin=dict(l=5, r=5, t=10, b=5), yaxis_title="", xaxis_title="Relative importance")
         st.plotly_chart(fig_feat, use_container_width=True)
 
 with tab_sim:
@@ -750,8 +836,8 @@ with tab_sim:
     sim = filtered.copy()
     sim["sim_premium"] = sim["premium"] * (1 + premium_change / 100)
     sim["sim_lapse_probability"] = sim["lapse_probability"] * (1 - retention_lift / 100)
-    sim["sim_underpriced"] = sim["sim_premium"] < (sim["predicted_claim_cost"] * 0.8)
-    sim["sim_profitable"] = sim["sim_premium"] > sim["predicted_claim_cost"]
+    sim["sim_underpriced"] = sim["sim_premium"] < (sim["expected_claim_cost"] * 0.8)
+    sim["sim_profitable"] = sim["sim_premium"] > sim["expected_claim_cost"]
     sim_threshold = sim["sim_lapse_probability"].quantile(lapse_percentile / 100)
 
     def sim_action(row: pd.Series) -> str:
@@ -776,14 +862,23 @@ with tab_sim:
             "After": [after.get(a, 0) for a in sorted(set(before.index) | set(after.index))],
         }
     )
-    fig_impact = px.bar(impact, x="Action", y=["Before", "After"], barmode="group")
+    impact["Action"] = impact["Action"].map(PLOT_ACTION_LABELS).fillna(impact["Action"])
+    impact_long = impact.melt(id_vars="Action", var_name="Scenario", value_name="Records")
+    fig_impact = px.bar(
+        impact_long,
+        x="Action",
+        y="Records",
+        color="Scenario",
+        barmode="group",
+        labels={"Action": "Action", "Records": "Records"},
+    )
     fig_impact.update_layout(height=360, margin=dict(l=5, r=5, t=10, b=5))
     st.plotly_chart(fig_impact, use_container_width=True)
 
     rev_before = sim["premium"].sum()
     rev_after = sim["sim_premium"].sum()
-    profit_before = rev_before - sim["predicted_claim_cost"].sum()
-    profit_after = rev_after - sim["predicted_claim_cost"].sum()
+    profit_before = rev_before - sim["expected_claim_cost"].sum()
+    profit_after = rev_after - sim["expected_claim_cost"].sum()
     f1, f2, f3 = st.columns(3)
     with f1:
         kpi_card("Revenue impact", fmt_money(rev_after - rev_before), f"{premium_change:+d}% premium move")
@@ -793,23 +888,30 @@ with tab_sim:
         kpi_card("Avg lapse after lift", fmt_pct(sim["sim_lapse_probability"].mean()), f"{retention_lift}% retention lift")
 
 with tab_records:
-    panel_header("Customer-level risk view", f"top {top_n} by lapse probability")
-    records = filtered.sort_values("lapse_probability", ascending=False).head(top_n)
+    panel_header("Customer-level risk view", f"top {top_n} by lapse risk")
+    records = filtered.sort_values("lapse_probability", ascending=False).head(top_n).copy()
+    records_display = pd.DataFrame(
+        {
+            "Customer": records["ID"],
+            "Age": records["age"],
+            "Gender": records["gender_display"],
+            "Product": records["product_display"],
+            "Policy": records["policy_display"],
+            "Premium": records["premium"],
+            "Expected claim": records["expected_claim_cost"],
+            "Lapse risk": records["lapse_probability"] * 100,
+            "Loss": records["loss_ratio"],
+            "Action": records["decision_action"].map(ACTION_LABELS),
+        }
+    )
     st.dataframe(
-        records[
-            [
-                "ID",
-                "age",
-                "gender",
-                "type_product",
-                "type_policy_dg",
-                "premium",
-                "predicted_claim_cost",
-                "lapse_probability",
-                "loss_ratio",
-                "decision_action",
-            ]
-        ],
+        records_display,
+        column_config={
+            "Premium": st.column_config.NumberColumn("Premium", format="$%d"),
+            "Expected claim": st.column_config.NumberColumn("Expected claim", format="$%d"),
+            "Lapse risk": st.column_config.NumberColumn("Lapse risk", format="%.1f%%"),
+            "Loss": st.column_config.NumberColumn("Loss", format="%.2f"),
+        },
         use_container_width=True,
         hide_index=True,
     )
