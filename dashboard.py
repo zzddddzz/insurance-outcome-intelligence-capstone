@@ -577,9 +577,51 @@ def add_css() -> None:
         }
 
         .stTabs [role="tablist"] {
-            background: var(--bg-page);
-            min-height: 46px;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid var(--line-1);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(14, 27, 31, 0.06);
+            gap: 6px;
+            min-height: 58px;
             overflow-anchor: none;
+            overflow-x: auto;
+            padding: 6px;
+        }
+
+        .stTabs [role="tab"] {
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--ink-2) !important;
+            min-height: 42px;
+            min-width: unset !important;
+            padding: 0 12px;
+        }
+
+        .stTabs [role="tab"] p {
+            color: var(--ink-2) !important;
+            font-size: 15px !important;
+            font-weight: 800 !important;
+            white-space: nowrap;
+        }
+
+        .stTabs [role="tab"]:hover:not([aria-selected="true"]) {
+            background: var(--bg-soft);
+            border-color: var(--line-1);
+        }
+
+        .stTabs [role="tab"][aria-selected="true"] {
+            background: var(--ink-1);
+            border-color: var(--ink-1);
+            box-shadow: 0 1px 3px rgba(14, 27, 31, 0.18);
+        }
+
+        .stTabs [role="tab"][aria-selected="true"] p {
+            color: #ffffff !important;
+        }
+
+        .stTabs [data-baseweb="tab-highlight"] {
+            display: none;
         }
 
         .stTabs [role="tabpanel"] {
@@ -593,6 +635,9 @@ def add_css() -> None:
             .segment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .panel-head { align-items: flex-start; flex-direction: column; }
             .panel-meta { text-align: left; }
+            .stTabs [role="tablist"] { gap: 4px; padding: 5px; }
+            .stTabs [role="tab"] { padding: 0 9px; }
+            .stTabs [role="tab"] p { font-size: 14px !important; }
         }
 
         @media (max-width: 520px) {
