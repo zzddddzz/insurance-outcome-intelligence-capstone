@@ -710,7 +710,7 @@ st.markdown(
 st.markdown(
     f"""
     <div class="exec-brief">
-        <div class="exec-eyebrow">Where the exposure is</div>
+        <div class="exec-eyebrow">Current exposure</div>
         <div class="exec-title">Protect {fmt_money(retention_premium)} in premium at risk while addressing {fmt_money(early_expected_claim)} in expected claim exposure.</div>
         <div class="exec-copy">
         Start with {fmt_int(priority_records)} priority customers:
@@ -726,8 +726,8 @@ st.markdown(
     f"""
     <div class="exec-grid">
         <div class="exec-card">
-            <div class="exec-label">Where to start</div>
-            <div class="exec-value">Launch focused outreach</div>
+            <div class="exec-label">First wave</div>
+            <div class="exec-value">Focused outreach</div>
             <div class="exec-note">Direct retention spend to customers with the clearest business upside.</div>
         </div>
         <div class="exec-card">
@@ -742,8 +742,8 @@ st.markdown(
         </div>
         <div class="exec-card">
             <div class="exec-label">Confidence</div>
-            <div class="exec-value">Reliable for prioritization</div>
-            <div class="exec-note">The ranking is stable enough to guide outreach and intervention sequencing.</div>
+            <div class="exec-value">Use for sequencing</div>
+            <div class="exec-note">The ranking supports outreach and intervention order.</div>
         </div>
     </div>
     """,
@@ -784,7 +784,7 @@ filtered["action_label"] = (
 left, right = st.columns([1.35, 1])
 
 with left:
-    panel_header("Risk and value map", "lapse risk x expected claim cost")
+    panel_header("Lapse risk vs claim exposure", "each point is a customer record")
     threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
     cost_median = filtered["expected_claim_cost"].median()
 
@@ -832,7 +832,7 @@ with left:
     st.plotly_chart(fig, use_container_width=True)
 
 with right:
-    panel_header("Portfolio action split", f"{fmt_int(filtered.shape[0])} records")
+    panel_header("Work queue split", f"{fmt_int(filtered.shape[0])} records")
     action_counts = (
         filtered["decision_action"]
         .value_counts()
@@ -874,11 +874,11 @@ seg_filtered = seg_summary[
 
 rank_col, detail_col = st.columns([1, 1])
 with rank_col:
-    panel_header("Ranked segments", f"{len(seg_filtered)} active segments")
+    panel_header("Highest-risk segments", f"{len(seg_filtered)} active segments")
     segment_cards(seg_filtered)
 
 with detail_col:
-    panel_header("Segment table", "formatted executive view")
+    panel_header("Segment detail", "sortable by risk and margin")
     segment_table = pd.DataFrame(
         {
             "Product": seg_filtered["type_product"].map(product_label),
@@ -1054,5 +1054,5 @@ with tab_records:
     )
 
 st.caption(
-    "Insurance Outcome Intelligence | Planning view for management discussion."
+    "Insurance Outcome Intelligence | Portfolio planning view."
 )
