@@ -358,56 +358,6 @@ def add_css() -> None:
             font-weight: 650;
         }
 
-        .segment-html-table {
-            background: var(--bg-card);
-            border: 1px solid var(--line-1);
-            border-collapse: collapse;
-            table-layout: fixed;
-            width: 100%;
-        }
-
-        .segment-html-table th {
-            background: #eef3ef;
-            border-bottom: 1px solid var(--line-1);
-            color: var(--ink-2);
-            font-size: 12.5px;
-            font-weight: 800;
-            letter-spacing: 0;
-            line-height: 1.15;
-            padding: 9px 9px;
-            text-align: left;
-            text-transform: none;
-            white-space: nowrap;
-        }
-
-        .segment-html-table td {
-            border-bottom: 1px solid var(--line-2);
-            color: var(--ink-2);
-            font-size: 13.5px;
-            font-weight: 600;
-            line-height: 1.25;
-            padding: 9px 9px;
-            white-space: nowrap;
-        }
-
-        .segment-html-table tbody tr:nth-child(even) td {
-            background: #fafbf9;
-        }
-
-        .segment-html-table th:nth-child(n+3),
-        .segment-html-table td:nth-child(n+3) {
-            text-align: right;
-        }
-
-        .segment-html-table th:nth-child(1) { width: 8%; }
-        .segment-html-table th:nth-child(2) { width: 9%; }
-        .segment-html-table th:nth-child(3) { width: 15%; }
-        .segment-html-table th:nth-child(4),
-        .segment-html-table th:nth-child(5) { width: 16%; }
-        .segment-html-table th:nth-child(6) { width: 12%; }
-        .segment-html-table th:nth-child(7) { width: 13%; }
-        .segment-html-table th:nth-child(8) { width: 11%; }
-
         @media (max-width: 800px) {
             .topbar { align-items: flex-start; gap: 10px; }
             .segment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -708,43 +658,33 @@ seg_filtered = seg_summary[
     & seg_summary["type_policy_dg"].isin(policies)
 ].copy()
 
-panel_header("Ranked segments", f"{len(seg_filtered)} active segments")
-segment_cards(seg_filtered)
+rank_col, detail_col = st.columns([1, 1])
+with rank_col:
+    panel_header("Ranked segments", f"{len(seg_filtered)} active segments")
+    segment_cards(seg_filtered)
 
-panel_header("Segment table", "full-width, formatted")
-segment_table = pd.DataFrame(
-    {
-        "Product": seg_filtered["type_product"],
-        "Policy": seg_filtered["type_policy_dg"],
-        "Members": seg_filtered["count"],
-        "Avg Premium": seg_filtered["avg_premium"],
-        "Avg Claim": seg_filtered["avg_claim"],
-        "Lapse Rate": seg_filtered["lapse_rate"] * 100,
-        "Loss Ratio": seg_filtered["loss_ratio"],
-        "Avg Age": seg_filtered["avg_age"],
-    }
-).sort_values(["Lapse Rate", "Loss Ratio", "Members"], ascending=[False, False, False])
-segment_display = pd.DataFrame(
-    {
-        "Prod": segment_table["Product"],
-        "Policy": segment_table["Policy"],
-        "Members": segment_table["Members"].map(lambda value: f"{value:,.0f}"),
-        "Premium": segment_table["Avg Premium"].map(lambda value: f"${value:,.0f}"),
-        "Claim": segment_table["Avg Claim"].map(lambda value: f"${value:,.0f}"),
-        "Lapse": segment_table["Lapse Rate"].map(lambda value: f"{value:.1f}%"),
-        "Loss": segment_table["Loss Ratio"].map(lambda value: f"{value:.2f}"),
-        "Age": segment_table["Avg Age"].map(lambda value: f"{value:.1f}"),
-    }
-)
-st.markdown(
-    segment_display.to_html(
-        index=False,
-        classes="segment-html-table",
-        border=0,
-        escape=False,
-    ),
-    unsafe_allow_html=True,
-)
+with detail_col:
+    panel_header("Segment table", "sortable, filter-aware")
+    segment_table = seg_filtered.rename(
+        columns={
+            "type_product": "Product",
+            "type_policy_dg": "Policy",
+            "count": "Members",
+            "avg_premium": "Avg Premium",
+            "avg_claim": "Avg Claim",
+            "lapse_rate": "Lapse Rate",
+            "loss_ratio": "Loss Ratio",
+            "avg_age": "Avg Age",
+        }
+    )
+    st.dataframe(
+        segment_table[
+            ["Product", "Policy", "Members", "Avg Premium", "Avg Claim", "Lapse Rate", "Loss Ratio", "Avg Age"]
+        ],
+        use_container_width=True,
+        hide_index=True,
+        height=492,
+    )
 
 tab_overview, tab_model, tab_sim, tab_records = st.tabs(
     ["Portfolio trends", "Model evidence", "Simulator", "Customer records"]
