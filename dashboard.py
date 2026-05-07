@@ -365,22 +365,26 @@ def add_css() -> None:
         }
 
         .action-chip {
-            border: 1px solid;
+            border: 0;
             border-radius: 3px;
+            box-shadow: none;
+            cursor: default;
             display: inline-block;
             font-size: 11.5px;
             font-weight: 800;
             letter-spacing: 0;
-            padding: 2px 7px;
+            padding: 3px 7px;
+            pointer-events: none;
             text-transform: none;
             white-space: nowrap;
         }
 
-        .chip-retain { background: #eaf3e7; border-color: #bfd8bb; color: #2f7d51; }
-        .chip-review_pricing { background: #f7e6e3; border-color: #e2c0bd; color: #9b3f42; }
-        .chip-early_risk { background: #f3dbd9; border-color: #dbaaa7; color: #8f3d3d; }
-        .chip-low_priority { background: #eee8f7; border-color: #cdc1e0; color: #67518c; }
-        .chip-standard { background: #e7edf3; border-color: #bfd0df; color: #315f86; }
+        .chip-retain,
+        .chip-retain_high { background: #eaf3e7; color: #2f7d51; }
+        .chip-review_pricing { background: #f7e6e3; color: #9b3f42; }
+        .chip-early_risk { background: #f3dbd9; color: #8f3d3d; }
+        .chip-low_priority { background: #eee8f7; color: #67518c; }
+        .chip-standard { background: #e7edf3; color: #315f86; }
 
         .segment-card {
             background: var(--bg-card);
