@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -719,6 +720,59 @@ def records_text(value: float) -> str:
     return f"{fmt_int(value)} modeled records"
 
 
+def amount_distribution_ceiling(frame: pd.DataFrame) -> float:
+    values = pd.concat(
+        [
+            frame["premium"].clip(lower=0),
+            frame["expected_claim_cost"].clip(lower=0),
+        ],
+        ignore_index=True,
+    ).dropna()
+    if values.empty:
+        return 500.0
+    return float(max(500, math.ceil(values.quantile(0.99) / 500) * 500))
+
+
+def amount_distribution_figure(frame: pd.DataFrame, ceiling: float) -> go.Figure:
+    bin_size = max(50, ceiling / 45)
+    fig = go.Figure()
+    fig.add_trace(
+        go.Histogram(
+            x=frame.loc[frame["premium"].between(0, ceiling), "premium"],
+            name="Premium",
+            histnorm="percent",
+            opacity=0.72,
+            marker_color="#315f86",
+            xbins=dict(start=0, end=ceiling, size=bin_size),
+            hovertemplate="Premium<br>Annual amount: %{x:$,.0f}<br>Shown records: %{y:.1f}%<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Histogram(
+            x=frame.loc[frame["expected_claim_cost"].between(0, ceiling), "expected_claim_cost"],
+            name="Expected claim",
+            histnorm="percent",
+            opacity=0.62,
+            marker_color="#b9484a",
+            xbins=dict(start=0, end=ceiling, size=bin_size),
+            hovertemplate="Expected claim<br>Annual amount: %{x:$,.0f}<br>Shown records: %{y:.1f}%<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        barmode="overlay",
+        height=330,
+        margin=dict(l=8, r=8, t=34, b=46),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        xaxis_title="Annual amount",
+        yaxis_title="Shown records",
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+    )
+    fig.update_xaxes(range=[0, ceiling], title_standoff=12, tickprefix="$", separatethousands=True)
+    fig.update_yaxes(title_standoff=10, ticksuffix="%", rangemode="tozero")
+    return fig
+
+
 def product_label(value: str) -> str:
     return PRODUCT_LABELS.get(str(value), str(value))
 
@@ -1285,24 +1339,24 @@ with tab_overview:
             color_continuous_scale="Reds",
             labels={"age_group": "Age group", "lapse_rate": "Lapse rate"},
         )
-        fig_age.update_layout(height=330, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
+        fig_age.update_layout(
+            height=330,
+            margin=dict(l=5, r=5, t=5, b=5),
+            showlegend=False,
+            coloraxis_showscale=False,
+        )
+        fig_age.update_traces(
+            hovertemplate="Age group: %{x}<br>Lapse rate: %{y:.1%}<extra></extra>"
+        )
         fig_age.update_yaxes(tickformat=".0%")
         st.plotly_chart(fig_age, width="stretch")
     with c2:
-        panel_header("Premium vs claim distribution", "selected portfolio")
-        fig_hist = go.Figure()
-        fig_hist.add_trace(go.Histogram(x=filtered["premium"], name="Premium", opacity=0.72, marker_color="#315f86"))
-        fig_hist.add_trace(go.Histogram(x=filtered["expected_claim_cost"], name="Expected claim", opacity=0.62, marker_color="#b9484a"))
-        fig_hist.update_layout(
-            barmode="overlay",
-            height=330,
-            margin=dict(l=8, r=8, t=34, b=46),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-            xaxis_title="Annual amount",
-            yaxis_title="Records",
+        amount_ceiling = amount_distribution_ceiling(filtered)
+        panel_header(
+            "Premium vs claim distribution",
+            f"middle 99% shown · visual max {fmt_money(amount_ceiling)}",
         )
-        fig_hist.update_xaxes(title_standoff=12)
-        fig_hist.update_yaxes(title_standoff=10)
+        fig_hist = amount_distribution_figure(filtered, amount_ceiling)
         st.plotly_chart(fig_hist, width="stretch")
 
 with tab_model:
@@ -1568,7 +1622,15 @@ with tab_appendix:
             color_continuous_scale="Reds",
             labels={"age_group": "Age group", "lapse_rate": "Lapse rate"},
         )
-        fig_age_lapse.update_layout(height=320, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
+        fig_age_lapse.update_layout(
+            height=320,
+            margin=dict(l=5, r=5, t=5, b=5),
+            showlegend=False,
+            coloraxis_showscale=False,
+        )
+        fig_age_lapse.update_traces(
+            hovertemplate="Age group: %{x}<br>Lapse rate: %{y:.1%}<extra></extra>"
+        )
         fig_age_lapse.update_yaxes(tickformat=".0%")
         st.plotly_chart(fig_age_lapse, width="stretch")
     with age_r:
@@ -1581,7 +1643,15 @@ with tab_appendix:
             color_continuous_scale="Blues",
             labels={"age_group": "Age group", "avg_claim": "Expected claim"},
         )
-        fig_age_claim.update_layout(height=320, margin=dict(l=5, r=5, t=5, b=5), showlegend=False)
+        fig_age_claim.update_layout(
+            height=320,
+            margin=dict(l=5, r=5, t=5, b=5),
+            showlegend=False,
+            coloraxis_showscale=False,
+        )
+        fig_age_claim.update_traces(
+            hovertemplate="Age group: %{x}<br>Expected claim: %{y:$,.0f}<extra></extra>"
+        )
         st.plotly_chart(fig_age_claim, width="stretch")
 
     panel_header("Work queue detail", "filtered action split")
