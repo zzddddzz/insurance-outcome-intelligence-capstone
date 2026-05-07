@@ -621,8 +621,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown("### Filters")
-with st.container(border=True):
+with st.expander("Filters", expanded=True):
     product_options = sorted(df["type_product"].dropna().unique())
     policy_options = sorted(df["type_policy_dg"].dropna().unique())
     channel_options = sorted(df["distribution_channel"].dropna().unique())
