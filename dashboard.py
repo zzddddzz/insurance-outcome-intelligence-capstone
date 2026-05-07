@@ -795,6 +795,37 @@ def summarize_age(frame: pd.DataFrame, age_order: list[str]) -> pd.DataFrame:
     return summary
 
 
+def scatter_display_sample(
+    frame: pd.DataFrame,
+    max_points: int = 5000,
+    min_per_action: int = 450,
+) -> tuple[pd.DataFrame, str]:
+    """Return a balanced display sample so smaller action queues remain visible."""
+    if frame.shape[0] <= max_points:
+        return frame.copy(), "each point is one record"
+
+    action_groups = list(frame.groupby("decision_action", observed=False))
+    if not action_groups:
+        return frame.head(0).copy(), "no records to plot"
+
+    base_n = min(min_per_action, max(1, max_points // len(action_groups)))
+    base_parts = []
+    for _, group in action_groups:
+        take = min(base_n, group.shape[0])
+        base_parts.append(group.sample(n=take, random_state=42))
+
+    sampled = pd.concat(base_parts, axis=0)
+    remaining_slots = max(max_points - sampled.shape[0], 0)
+    remaining = frame.drop(index=sampled.index)
+    if remaining_slots and not remaining.empty:
+        fill = remaining.sample(n=min(remaining_slots, remaining.shape[0]), random_state=7)
+        sampled = pd.concat([sampled, fill], axis=0)
+
+    sampled = sampled.sort_values("lapse_probability", ascending=False)
+    meta = f"stratified display sample: {fmt_int(sampled.shape[0])} of {fmt_int(frame.shape[0])} records"
+    return sampled, meta
+
+
 def panel_header(title: str, meta: str = "") -> None:
     st.markdown(
         f"""
@@ -1093,12 +1124,11 @@ active_age_summary = summarize_age(filtered, age_order)
 left, right = st.columns([1.35, 1])
 
 with left:
-    scatter_meta = "top 5,000 records by lapse risk" if filtered.shape[0] > 5000 else "each point is one record"
+    plot_sample, scatter_meta = scatter_display_sample(filtered)
     panel_header("Lapse risk vs claim exposure", scatter_meta)
     threshold = filtered["lapse_probability"].quantile(lapse_percentile / 100)
     cost_median = filtered["expected_claim_cost"].median()
 
-    plot_sample = filtered.sort_values("lapse_probability", ascending=False).head(5000)
     fig = px.scatter(
         plot_sample,
         x="expected_claim_cost",
