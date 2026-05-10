@@ -859,7 +859,7 @@ def queue_split_figure(action_counts: pd.DataFrame, total_records: int) -> go.Fi
             orientation="h",
             marker=dict(color=queue["color"], line=dict(width=0)),
             customdata=queue[["label"]],
-            hovertemplate="%{y}<br>%{customdata[0]} of selected portfolio<extra></extra>",
+            hovertemplate="%{y}<br>%{customdata[0]} of records in view<extra></extra>",
             showlegend=False,
         )
     )
@@ -877,7 +877,7 @@ def queue_split_figure(action_counts: pd.DataFrame, total_records: int) -> go.Fi
             textposition="middle right",
             textfont=dict(color="#46565e", size=12),
             customdata=queue[["label"]],
-            hovertemplate="%{y}<br>%{customdata[0]} of selected portfolio<extra></extra>",
+            hovertemplate="%{y}<br>%{customdata[0]} of records in view<extra></extra>",
             cliponaxis=False,
             showlegend=False,
         )
@@ -1357,7 +1357,7 @@ with left:
     st.plotly_chart(fig, width="stretch")
 
 with right:
-    panel_title = "Work queue split" if selected_action == "ALL" else "Selected queue"
+    panel_title = "Recommended work queue" if selected_action == "ALL" else "Selected action"
     panel_meta = f"{fmt_int(filtered.shape[0])} records"
     panel_header(panel_title, panel_meta)
     action_counts = (
@@ -1390,7 +1390,7 @@ with right:
                     <div class="panel-meta">{fmt_share_pct(queue_share)} of current portfolio</div>
                 </div>
                 <div class="queue-count">{fmt_int(queue_count)}</div>
-                <div class="queue-caption">records in this action queue</div>
+                <div class="queue-caption">records in this recommended action</div>
                 <div class="queue-track">
                     <div class="queue-fill" style="width:{queue_fill_width:.1f}%"></div>
                 </div>
