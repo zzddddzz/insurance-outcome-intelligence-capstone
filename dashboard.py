@@ -1705,7 +1705,12 @@ with tab_appendix:
             .agg(lapse_rate=("lapse_probability", "mean"))
             .reset_index()
         )
-        pivot = heat_data.pivot(index="product_display", columns="policy_display", values="lapse_rate")
+        product_order = [product_label(value) for value in ["S", "P", "I", "D"]]
+        policy_order = [policy_label(value) for value in ["C1", "C2", "C3", "C4", "I", "SE"]]
+        pivot = (
+            heat_data.pivot(index="product_display", columns="policy_display", values="lapse_rate")
+            .reindex(index=product_order, columns=policy_order)
+        )
         heat_text = pivot.copy()
         for column in heat_text.columns:
             heat_text[column] = heat_text[column].map(
@@ -1719,6 +1724,8 @@ with tab_appendix:
                 text=heat_text.values,
                 texttemplate="%{text}",
                 colorscale="RdYlGn_r",
+                xgap=1,
+                ygap=1,
                 colorbar=dict(title="Lapse"),
             )
         )
@@ -1729,6 +1736,13 @@ with tab_appendix:
             plot_bgcolor="#ffffff",
             xaxis_title="Policy",
             yaxis_title="Product",
+        )
+        fig_heat.update_xaxes(
+            showgrid=False,
+        )
+        fig_heat.update_yaxes(
+            autorange="reversed",
+            showgrid=False,
         )
         st.plotly_chart(fig_heat, width="stretch")
 
