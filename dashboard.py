@@ -849,6 +849,7 @@ def queue_split_figure(action_counts: pd.DataFrame, total_records: int) -> go.Fi
     queue["color"] = queue["decision_action"].map(ACTION_COLORS)
     queue = queue.sort_values("count", ascending=True)
     max_count = max(float(queue["count"].max()), 1.0)
+    label_gutter = max_count * 0.28
 
     fig = go.Figure()
     fig.add_trace(
@@ -877,18 +878,19 @@ def queue_split_figure(action_counts: pd.DataFrame, total_records: int) -> go.Fi
             textfont=dict(color="#46565e", size=12),
             customdata=queue[["label"]],
             hovertemplate="%{y}<br>%{customdata[0]} of selected portfolio<extra></extra>",
+            cliponaxis=False,
             showlegend=False,
         )
     )
     fig.update_layout(
         height=280,
-        margin=dict(l=0, r=72, t=5, b=5),
+        margin=dict(l=0, r=112, t=5, b=5),
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
         font=dict(family="Inter Tight, Arial", color="#29363c", size=14),
     )
     fig.update_xaxes(
-        range=[0, max_count * 1.18],
+        range=[0, max_count + label_gutter],
         gridcolor="#e8eae5",
         title="Records",
         title_font=dict(size=15),
